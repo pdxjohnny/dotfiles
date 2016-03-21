@@ -45,7 +45,7 @@ for CURR in ${ADD_PATH[@]}; do
 done
 
 # Source all the files that need to be sourced
-for file in $(ls -a | grep '_source'); do
-    source $file
+for file in $(ls -a ${HOME} | grep '_source'); do
+    source "${HOME}/$file"
 done
 
