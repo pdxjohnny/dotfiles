@@ -1,0 +1,50 @@
+#!/bin/bash
+#
+# ~/.pdxjohnnyrc
+#
+
+# If not running interactively, don't do anything
+[[ $- != *i* ]] && return
+
+# History config
+unset HISTFILESIZE
+export HISTSIZE=10000
+export HISTFILESIZE=10000
+shopt -s histappend
+export PROMPT_COMMAND='history -a'
+export HISTCONTROL=ignoredups
+
+# Fixes font issues
+export XDG_CONFIG_HOME="${HOME}/.config"
+
+# Prompt config
+export PS1='[\u@\h \W]\$ '
+
+# Add ll
+alias ls='ls --color=always'
+alias ll='ls -lAF'
+
+# Lynx config
+export WWW_HOME="https://google.com"
+alias lynx='lynx -accept_all_cookies'
+
+# Go config
+export GOPATH="${HOME}/Documents/go"
+alias gh="cd ${GOPATH}/src/github.com/pdxjohnny"
+
+# Android config
+export ANDROID_HOME="${HOME}/Android/Sdk"
+
+# Add to path
+ADD_PATH=("${HOME}/.local/bin" "${GOPATH}/bin" "${ANDROID_HOME}/platform-tools")
+for CURR in ${ADD_PATH[@]}; do
+    if [ -d $CURR ]; then
+        export PATH="$PATH:$CURR"
+    fi
+done
+
+# Source all the files that need to be sourced
+for file in $(ls -a | grep '_source'); do
+    source $file
+done
+

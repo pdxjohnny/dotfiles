@@ -1,0 +1,14 @@
+#!/bin/bash
+
+SHIT () {
+	sudo shutdown now
+}
+
+ggs () {
+	query=$(echo "${@}" | sed 's/ /+/g')
+	lynx "https://www.google.com/search?ie=ISO-8859-1&hl=en&source=hp&q=${query}&btnG=Google+Search&gbv=1"
+}
+
+wttr () {
+	curl wttr.in
+}
