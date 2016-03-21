@@ -5,7 +5,7 @@ set tw=79
 " 80 characters line
 set colorcolumn=81
 "execute "set colorcolumn=" . join(range(81,335), ',')
-highlight ColorColumn ctermbg=Black ctermfg=DarkRed
+highlight ColorColumn ctermbg=Grey ctermfg=DarkRed
 " Highlight trailing spaces
 " http://vim.wikia.com/wiki/Highlight_unwanted_spaces
 highlight ExtraWhitespace ctermbg=red guibg=red
