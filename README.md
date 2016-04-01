@@ -7,24 +7,9 @@ Install
 ---
 
 ```bash
-./pathogen-install.sh && \
-./link.sh
-```
-
-Bashrc
----
-
-Place this in your ~/.bashrc
-
-```bash
-. ~/.pdxjohnnyrc
-```
-
-```bash
-cat > ~/.bashrc << EOF
-
-. ~/.pdxjohnnyrc
-
-EOF
+git clone https://github.com/pdxjohnny/dotfiles && \
+cd dotfiles && \
+./install.sh && \
+echo -e '\nsource "${HOME}/.pdxjohnnyrc"\n' >> ~/.bashrc
 ```
 
