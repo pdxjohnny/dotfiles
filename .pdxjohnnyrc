@@ -46,6 +46,9 @@ alias lll='ls --color=always -lAF | less -r'
 export WWW_HOME="https://google.com"
 alias lynx='lynx -accept_all_cookies'
 
+# GPG password in terminal
+export GPG_TTY=$(tty)
+
 # Go config
 export GOPATH="${HOME}/Documents/go"
 alias gh="cd ${GOPATH}/src/github.com/pdxjohnny"
