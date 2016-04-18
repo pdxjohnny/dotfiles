@@ -34,7 +34,7 @@ valgrindl () {
 }
 # Anything throgh less
 lessit () {
-    bash -c "$@" 2>&1 | less -r
+    $@ 2>&1 | less -r
 }
 
 # Add ll
