@@ -23,3 +23,6 @@ set shiftwidth=4
 " On pressing tab, insert 4 spaces
 set expandtab
 set softtabstop=4
+
+" More copy paste lines
+set viminfo='20,<1000

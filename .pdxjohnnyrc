@@ -8,8 +8,8 @@
 
 # History config
 unset HISTFILESIZE
-export HISTSIZE=10000
-export HISTFILESIZE=10000
+export HISTSIZE=1000000
+export HISTFILESIZE=1000000
 shopt -s histappend
 export PROMPT_COMMAND='history -a'
 export HISTCONTROL=ignoredups
@@ -26,21 +26,24 @@ alias ag='grep --color=always -Hrn'
 
 # Make and valgrind through less
 makel () {
-    make $@ 2>&1 | less -r
+    make "$@" 2>&1 | less -r
 }
 valgrindl () {
-    valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes $@ \
+    valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes "$@" \
         2>&1 | less -r
 }
 # Anything throgh less
 lessit () {
-    $@ 2>&1 | less -r
+    "$@" 2>&1 | less -r
 }
 
 # Add ll
 alias ls='ls --color=auto'
 alias ll='ls -lAF'
 alias lll='ls --color=always -lAF | less -r'
+
+# VPN like proxy through ssh
+alias vpn="sshuttle --dns -r $VPN_SERVER 0/0"
 
 # Lynx config
 export WWW_HOME="https://google.com"
@@ -56,6 +59,12 @@ alias gh="cd ${GOPATH}/src/github.com/pdxjohnny"
 # Android config
 export ANDROID_HOME="${HOME}/Android/Sdk"
 
+# For clang-analyze
+command -v clang >/dev/null 2>&1 && export CC=ccc-analyzer
+command -v clang >/dev/null 2>&1 && export CCC_CC=clang
+command -v clang++ >/dev/null 2>&1 && export CXX=c++-analyzer
+command -v clang++ >/dev/null 2>&1 && export CCC_CXX=clang++
+
 # Add to path
 ADD_PATH=("${HOME}/.local/bin" "${GOPATH}/bin" "${ANDROID_HOME}/platform-tools")
 for CURR in ${ADD_PATH[@]}; do
@@ -68,4 +77,3 @@ done
 for file in $(ls -a ${HOME} | grep '_source'); do
     source "${HOME}/$file"
 done
-
