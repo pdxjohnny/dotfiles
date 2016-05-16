@@ -47,7 +47,7 @@ alias vpn="sshuttle --dns -r $VPN_SERVER 0/0"
 
 # Lynx config
 export WWW_HOME="https://google.com"
-alias lynx='lynx -accept_all_cookies'
+alias lynx="lynx -accept_all_cookies -cookie_file=$HOME/.lynx_cookies"
 
 # GPG password in terminal
 export GPG_TTY=$(tty)
