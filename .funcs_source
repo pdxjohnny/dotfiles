@@ -16,3 +16,7 @@ ggs () {
 wttr () {
 	curl wttr.in
 }
+
+msg() {
+    tmux display-message "$*"
+}
