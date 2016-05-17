@@ -54,7 +54,7 @@ export GPG_TTY=$(tty)
 
 # Go config
 export GOPATH="${HOME}/Documents/go"
-alias gh="cd ${GOPATH}/src/github.com/pdxjohnny"
+alias goh="cd ${GOPATH}/src/github.com/pdxjohnny"
 
 # Android config
 export ANDROID_HOME="${HOME}/Android/Sdk"
