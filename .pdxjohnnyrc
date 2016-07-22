@@ -56,6 +56,11 @@ export GPG_TTY=$(tty)
 export GOPATH="${HOME}/Documents/go"
 alias goh="cd ${GOPATH}/src/github.com/pdxjohnny"
 
+# Term broadcast
+gottyb () {
+    gotty tmux attach -t `tmux display -p '0'`
+}
+
 # Android config
 export ANDROID_HOME="${HOME}/Android/Sdk"
 
