@@ -1,6 +1,8 @@
 execute pathogen#infect()
 syntax on
 
+" setlocal spell spelllang=en_us
+
 set tw=79
 " 80 characters line
 set colorcolumn=81
@@ -23,6 +25,7 @@ set shiftwidth=4
 " On pressing tab, insert 4 spaces
 set expandtab
 set softtabstop=4
+set modeline
 
 " More copy paste lines
 set viminfo='20,<1000
