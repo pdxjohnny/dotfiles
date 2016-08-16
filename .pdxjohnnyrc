@@ -54,6 +54,7 @@ export GPG_TTY=$(tty)
 
 # Go config
 export GOPATH="${HOME}/Documents/go"
+export GOBIN="${GOPATH}/bin"
 alias goh="cd ${GOPATH}/src/github.com/pdxjohnny"
 
 # Term broadcast
@@ -69,6 +70,9 @@ command -v clang >/dev/null 2>&1 && export CC=ccc-analyzer
 command -v clang >/dev/null 2>&1 && export CCC_CC=clang
 command -v clang++ >/dev/null 2>&1 && export CXX=c++-analyzer
 command -v clang++ >/dev/null 2>&1 && export CCC_CXX=clang++
+
+# For clang-format
+alias clang-format="clang-format -style=llvm"
 
 # Add to path
 ADD_PATH=("${HOME}/.local/bin" "${GOPATH}/bin" "${ANDROID_HOME}/platform-tools")
