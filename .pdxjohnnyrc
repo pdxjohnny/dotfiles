@@ -37,6 +37,8 @@ lessit () {
     "$@" 2>&1 | less -r
 }
 
+alias ssh_proxy="ssh -nNT -D 9050"
+
 # Add ll
 alias ls='ls --color=auto'
 alias ll='ls -lAF'
@@ -58,12 +60,6 @@ alias goh="cd ${GOPATH}/src/github.com/pdxjohnny"
 
 # Android config
 export ANDROID_HOME="${HOME}/Android/Sdk"
-
-# For clang-analyze
-command -v clang >/dev/null 2>&1 && export CC=ccc-analyzer
-command -v clang >/dev/null 2>&1 && export CCC_CC=clang
-command -v clang++ >/dev/null 2>&1 && export CXX=c++-analyzer
-command -v clang++ >/dev/null 2>&1 && export CCC_CXX=clang++
 
 # Add to path
 ADD_PATH=("${HOME}/.local/bin" "${GOPATH}/bin" "${ANDROID_HOME}/platform-tools")
