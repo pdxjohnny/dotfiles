@@ -3,9 +3,9 @@ syntax on
 
 " setlocal spell spelllang=en_us
 
-set tw=79
+set tw=69
 " 80 characters line
-set colorcolumn=81
+set colorcolumn=70
 "execute "set colorcolumn=" . join(range(81,335), ',')
 highlight ColorColumn ctermbg=Grey ctermfg=DarkRed
 " Highlight trailing spaces
@@ -26,6 +26,7 @@ set shiftwidth=2
 set expandtab
 set modeline
 set softtabstop=2
+set bg=light
 
 autocmd Filetype ruby setlocal ts=2 sts=2 sw=2
 autocmd Filetype html setlocal ts=2 sts=2 sw=2
