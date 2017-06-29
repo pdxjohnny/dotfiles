@@ -60,6 +60,9 @@ export GPG_TTY=$(tty)
 export GOPATH="${HOME}/Documents/go"
 export GOBIN="${GOPATH}/bin"
 alias goh="cd ${GOPATH}/src/github.com/pdxjohnny"
+if [ -d $GOBIN ]; then
+  export PATH="$PATH:$GOBIN"
+fi
 
 # Term broadcast
 gottyb () {
