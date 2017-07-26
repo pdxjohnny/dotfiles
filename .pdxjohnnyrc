@@ -18,7 +18,8 @@ export HISTCONTROL=ignoredups
 export XDG_CONFIG_HOME="${HOME}/.config"
 
 # Prompt config
-export PS1='[\u@\h \W]\$ '
+# export PS1='[\u@\h \W]\$ '
+export PS1='\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\W\[\033[00m\]\$ '
 
 # Grep colors
 alias grep='grep --color=auto'
@@ -76,6 +77,17 @@ venv () {
     virtualenv -p python3 "$HOME/Documents/python/.venv"
   else
     source "$HOME/Documents/python/.venv/bin/activate"
+  fi
+}
+
+# Tensorflow Virtualenv
+tf () {
+  if [ ! -f "$HOME/tensorflow/bin/activate" ]; then
+    virtualenv --system-site-packages -p python3 "$HOME/.tensorflow"
+    source "$HOME/tensorflow/bin/activate"
+    pip install --upgrade tensorflow
+  else
+    source "$HOME/tensorflow/bin/activate"
   fi
 }
 
