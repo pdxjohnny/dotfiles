@@ -91,6 +91,16 @@ tf () {
   fi
 }
 
+# IPython Notebook
+notebook () {
+  venv
+  if [ ! -d "$HOME/Documents/python/notebook" ]; then
+    mkdir -p "$HOME/Documents/python/notebook"
+  fi
+  cd "$HOME/Documents/python/notebook"
+  jupyter notebook
+}
+
 # Android config
 export ANDROID_HOME="${HOME}/Android/Sdk"
 
