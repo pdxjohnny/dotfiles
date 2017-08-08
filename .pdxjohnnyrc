@@ -71,12 +71,12 @@ gottyb () {
 
 # Virtualenv
 venv () {
-  if [ ! -f "$HOME/Documents/python/.venv/bin/activate" ]; then
+  __venv="$HOME/Documents/python/.venv"
+  if [ ! -f "$__venv/bin/activate" ]; then
     mkdir -p "$HOME/Documents/python"
-    virtualenv -p python3 "$HOME/Documents/python/.venv"
-  else
-    source "$HOME/Documents/python/.venv/bin/activate"
+    virtualenv -p python3 "$__venv"
   fi
+  source "$__venv/bin/activate"
 }
 
 # Android config
