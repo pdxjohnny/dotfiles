@@ -82,12 +82,12 @@ venv () {
 
 # Tensorflow Virtualenv
 tf () {
-  if [ ! -f "$HOME/tensorflow/bin/activate" ]; then
+  if [ ! -f "$HOME/.tensorflow/bin/activate" ]; then
     virtualenv --system-site-packages -p python3 "$HOME/.tensorflow"
-    source "$HOME/tensorflow/bin/activate"
+    source "$HOME/.tensorflow/bin/activate"
     pip install --upgrade tensorflow
   else
-    source "$HOME/tensorflow/bin/activate"
+    source "$HOME/.tensorflow/bin/activate"
   fi
 }
 
