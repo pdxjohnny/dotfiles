@@ -1,8 +1,9 @@
 audio/*;                   /usr/bin/google-chrome-stable %s
 image/*;                   /usr/bin/google-chrome-stable %s
-application/msword;        /usr/bin/xdg-open %s
+application/msword;        /usr/bin/muttopen %s
 application/pdf;           /usr/bin/google-chrome-stable %s
-application/postscript;    /usr/bin/xdg-open %s
+application/postscript;    /usr/bin/muttopen %s
 application/json;          /usr/bin/python -m json.tool %s
 text/html;                 lynx %s; nametemplate=%s.html
 text/html;                 lynx -dump %s; nametemplate=%s.html; copiousoutput
+application/*;             /usr/bin/muttopen %s

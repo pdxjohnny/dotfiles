@@ -69,6 +69,12 @@ if [ -d $GOBIN ]; then
   export PATH="$PATH:$GOBIN"
 fi
 
+# bin config
+export PDXJOHNNY_BIN="${HOME}/.bin"
+if [ -d "$PDXJOHNNY_BIN" ]; then
+  export PATH="$PATH:$PDXJOHNNY_BIN"
+fi
+
 # Term broadcast
 gottyb () {
     gotty tmux attach -t `tmux display -p '0'`

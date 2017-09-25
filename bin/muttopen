@@ -1,0 +1,11 @@
+#!/bin/bash
+# Install: /usr/bin/
+set -e
+
+__OLD_DIR="$PWD"
+__TMP_DIR="$(mktemp -d)"
+cd "$__TMP_DIR"
+cp "$1" ./
+xdg-open "$(basename $1)"
+cd "$__OLD_DIR"
+rm -rf "$__TMP_DIR"
