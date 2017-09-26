@@ -1,7 +1,13 @@
 execute pathogen#infect()
 syntax on
 
+filetype plugin on
+
+set omnifunc=syntaxcomplete#Complete
+
+set autoread
 " setlocal spell spelllang=en_us
+setlocal omnifunc=go#complete#Complete
 
 set tw=69
 " 80 characters line
@@ -35,3 +41,7 @@ autocmd Filetype yaml setlocal ts=2 sts=2 sw=2
 
 " More copy paste lines
 set viminfo='20,<1000
+
+" YouCompleteMe Options
+let g:ycm_add_preview_to_completeopt = 1
+let g:ycm_autoclose_preview_window_after_completion = 1
