@@ -35,3 +35,6 @@ autocmd Filetype yaml setlocal ts=2 sts=2 sw=2
 
 " More copy paste lines
 set viminfo='20,<1000
+
+let g:ycm_autoclose_preview_window_after_completion = 1
+let g:ycm_autoclose_preview_window_after_insertion = 1
