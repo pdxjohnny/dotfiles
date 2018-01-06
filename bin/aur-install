@@ -2,12 +2,16 @@
 # This script builds and installs Arch Linux AUR repos
 set -e
 
+export MAKEFLAGS="-j$(nproc)"
+export CFLAGS="-march=native -O2"
+export CXXFLAGS="${CFLAGS}"
+cd
 for _pkg in "$@"
 do
   _temp_dir="$(mktemp -d)"
-  git clone "https://aur.archlinux.org/${_pkg}.git" "$_temp_dir"
-  cd "$_temp_dir"
+  git clone "https://aur.archlinux.org/${_pkg}.git" "${_temp_dir}"
+  cd "${_temp_dir}"
   makepkg -cs
   sudo pacman -U *.pkg.tar.xz
-  rm -rf "$_temp_dir"
+  rm -rf "${_temp_dir}"
 done
