@@ -1,7 +1,7 @@
-audio/*;                   /usr/bin/google-chrome-stable %s
-image/*;                   /usr/bin/google-chrome-stable %s
+audio/*;                   /usr/bin/firefox %s
+image/*;                   /usr/bin/firefox %s
 application/msword;        /usr/bin/muttopen %s
-application/pdf;           /usr/bin/google-chrome-stable %s
+application/pdf;           /usr/bin/firefox %s
 application/postscript;    /usr/bin/muttopen %s
 application/json;          /usr/bin/python -m json.tool %s
 text/html;                 lynx %s; nametemplate=%s.html

@@ -1,14 +1,13 @@
 #!/bin/bash
 # This script builds and installs Arch Linux AUR repos
+set -e
 
 for _pkg in "$@"
 do
-  _pre_dir=$PWD
   _temp_dir="$(mktemp -d)"
+  git clone "https://aur.archlinux.org/${_pkg}.git" "$_temp_dir"
   cd "$_temp_dir"
-  git clone "$_pkg" pkg
-  cd pkg
   makepkg -cs
-  sudo pacman -U *.gz
-  cd "$_pre_dir"
+  sudo pacman -U *.pkg.tar.xz
+  rm -rf "$_temp_dir"
 done
