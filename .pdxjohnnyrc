@@ -23,7 +23,18 @@ export PKG_CONFIG_PATH='/usr/local/lib/pkgconfig'
 
 # Prompt config
 # export PS1='[\u@\h \W]\$ '
-export PS1='\[\033[01;34m\]$(date)\[\033[00m\] \[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\W\[\033[00m\] \$ '
+if [ "$USER" == "johnsa1" ]; then
+  export PS1='\[\033[01;34m\]$(date)\[\033[00m\] \[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\W\[\033[00m\] \$ '
+else
+  # From Solus Linux
+  endchar="\$"
+  FG="\[\033[38;5;081m\]"
+  BG="\[\033[38;5;245m\]"
+  AT="\[\033[38;5;245m\]"
+  HCOLOR="\[\033[38;5;206m\]"
+
+  export PS1="${FG}\u${AT}@${HCOLOR}\H ${BG}\W ${FG}$endchar \[\e[0m\]"
+fi
 
 # Grep colors
 alias grep='grep --color=auto'
@@ -116,16 +127,31 @@ notebook () {
   jupyter notebook
 }
 
+spotify() {
+	docker run -it \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    -e DISPLAY=unix$DISPLAY \
+    --device /dev/snd \
+    --name spotify \
+    jess/spotify
+}
+
 # Android config
 export ANDROID_HOME="${HOME}/Android/Sdk"
 
 # For clang-format
 alias clang-format="clang-format -i -style=llvm"
 
+# For mbed
+if [ -f "/bin/arm-none-eabi-gcc" ]; then
+  export GCC_ARM_PATH="/bin"
+fi
+
 # Add to path
 ADD_PATH=("${HOME}/.local/bin" \
   "${GOPATH}/bin" \
   "${ANDROID_HOME}/platform-tools" \
+  "${HOME}/.local/usr/lib/npm-packages/bin" \
   "/home/johnsa1/.gem/ruby/2.3.0/bin")
 for CURR in ${ADD_PATH[@]}; do
     if [ -d $CURR ]; then
