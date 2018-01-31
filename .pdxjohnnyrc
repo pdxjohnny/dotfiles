@@ -53,7 +53,9 @@ lessit () {
     "$@" 2>&1 | less -r
 }
 
-alias tmpd="cd $(mktemp -d)"
+tmpd () {
+  cd $(mktemp -d)
+}
 
 alias ssh_proxy="ssh -nNT -D 9050"
 
