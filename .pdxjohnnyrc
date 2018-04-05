@@ -53,7 +53,9 @@ lessit () {
     "$@" 2>&1 | less -r
 }
 
-alias tmpd="cd $(mktemp -d)"
+tmpd () {
+  cd "$(mktemp -d)"
+}
 
 alias ssh_proxy="ssh -nNT -D 9050"
 
@@ -148,11 +150,13 @@ if [ -f "/bin/arm-none-eabi-gcc" ]; then
 fi
 
 # Add to path
+if which ruby >/dev/null && which gem >/dev/null; then
+  export PATH="$(ruby -rubygems -e 'puts Gem.user_dir')/bin:$PATH"
+fi
 ADD_PATH=("${HOME}/.local/bin" \
   "${GOPATH}/bin" \
   "${ANDROID_HOME}/platform-tools" \
-  "${HOME}/.local/usr/lib/npm-packages/bin" \
-  "/home/johnsa1/.gem/ruby/2.3.0/bin")
+  "${HOME}/.local/usr/lib/npm-packages/bin")
 for CURR in ${ADD_PATH[@]}; do
     if [ -d $CURR ]; then
         export PATH="$PATH:$CURR"
