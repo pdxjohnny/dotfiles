@@ -81,6 +81,7 @@ export GPG_TTY=$(tty)
 
 # Go config
 export GOPATH="${HOME}/Documents/go"
+export GOROOT="${HOME}/.local/go"
 export GOBIN="${GOPATH}/bin"
 alias goh="cd ${GOPATH}/src/github.com/pdxjohnny"
 if [ -d $GOBIN ]; then
@@ -181,7 +182,6 @@ if which ruby >/dev/null && which gem >/dev/null; then
   export PATH="$(ruby -rubygems -e 'puts Gem.user_dir')/bin:$PATH"
 fi
 ADD_PATH=("${HOME}/.local/bin" \
-  "${GOPATH}/bin" \
   "${ANDROID_HOME}/platform-tools" \
   "${HOME}/.local/usr/lib/npm-packages/bin" \
   "${HOME}/.yarn/bin")
