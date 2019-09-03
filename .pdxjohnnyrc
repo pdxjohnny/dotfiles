@@ -81,7 +81,7 @@ export GPG_TTY=$(tty)
 
 # Go config
 export GOPATH="${HOME}/Documents/go"
-export GOROOT="${HOME}/.local/go"
+# export GOROOT="${HOME}/.local/go"
 export GOBIN="${GOPATH}/bin"
 alias goh="cd ${GOPATH}/src/github.com/pdxjohnny"
 if [ -d $GOBIN ]; then
@@ -172,22 +172,83 @@ export ANDROID_HOME="${HOME}/Android/Sdk"
 # For clang-format
 alias clang-format="clang-format -i -style=llvm"
 
+alias youtube-dl="youtube-dl --no-call-home --no-cache-dir -x --audio-format mp3 --add-metadata --audio-quality 0 --restrict-filenames --yes-playlist --ignore-errors"
+
 # For mbed
 if [ -f "/bin/arm-none-eabi-gcc" ]; then
   export GCC_ARM_PATH="/bin"
 fi
 
+function killssh () {
+  kill $(ps aux | grep ssh | grep \@pts | awk '{print $2}')
+}
+
+function unloop_image {
+  if [ -b ${LOOP} ]; then
+    sudo losetup -d ${LOOP}
+    LOOP='/dev/non-existant'
+  fi
+}
+
+function loop_image {
+  IMAGE="${1}"
+  export LOOP=$(sudo losetup --find --show ${IMAGE})
+  trap unloop_image EXIT
+}
+
+function unmount_image {
+  if [ -d ${TMP_MNT_DIR} ]; then
+    if [ "x${PWD}" == "x${TMP_MNT_DIR}" ]; then
+      cd '/tmp'
+    fi
+    # Unmount image
+    export again=1
+    while [ "$again" -eq 1 ]; do
+      # Unmount image
+      sudo sync
+      ( sudo umount -d -R "${TMP_MNT_DIR}" && \
+        rm -rf "${TMP_MNT_DIR}" ) \
+        && export again=0 \
+      || \
+      export again=1
+    done
+    rm -rf ${TMP_MNT_DIR}
+  fi
+  unloop_image
+}
+
+function mount_image() {
+  export TMP_MNT_DIR=$(mktemp -d)
+  sudo partx -a ${LOOP}
+  sudo mount -o rw ${LOOP}p3 ${TMP_MNT_DIR} || (
+    SIZE=$(sudo fdisk -l ${LOOP} | grep Units: | awk '{print $(NF-1)}')
+    START=$(sudo fdisk -l ${LOOP} | grep 'Linux root' | awk '{print $2}')
+    OFFSET=$((SIZE * START))
+    sudo mount -o loop,rw,offset=${OFFSET} ${LOOP} ${TMP_MNT_DIR}
+  )
+  trap unmount_image EXIT
+}
+
+function randstr() {
+  python3 -c 'import os, hashlib; print(hashlib.sha384(os.urandom(int(4096 / 8))).hexdigest())'
+}
+
+export REACT_EDITOR=none
+
 # Add to path
-if which ruby >/dev/null && which gem >/dev/null; then
-  export PATH="$(ruby -rubygems -e 'puts Gem.user_dir')/bin:$PATH"
-fi
+# if which ruby >/dev/null && which gem >/dev/null; then
+#  export PATH="$(ruby -rubygems -e 'puts Gem.user_dir')/bin:$PATH"
+#fi
 ADD_PATH=("${HOME}/.local/bin" \
   "${ANDROID_HOME}/platform-tools" \
   "${HOME}/.local/usr/lib/npm-packages/bin" \
+  "${HOME}/Documents/flutter/flutter/bin" \
+  "${HOME}/Documents/flutter/flutter/bin/cache/dart-sdk/bin" \
+  "${HOME}/.pub-cache/bin" \
   "${HOME}/.yarn/bin")
 for CURR in ${ADD_PATH[@]}; do
     if [ -d $CURR ]; then
-        export PATH="$PATH:$CURR"
+        export PATH="$CURR:$PATH"
     fi
 done
 
