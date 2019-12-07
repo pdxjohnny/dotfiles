@@ -4,6 +4,7 @@ syntax on
 
 " setlocal spell spelllang=en_us
 
+set nofoldenable    " disable folding
 set nohlsearch
 set tw=80
 " 80 characters line
@@ -27,7 +28,11 @@ set shiftwidth=2
 set expandtab
 set modeline
 set softtabstop=2
-set bg=dark
+" set bg=dark
+
+let dart_format_on_save=1
+let dart_html_in_string=v:true
+let dart_style_guide=2
 
 autocmd Filetype ruby setlocal ts=2 sts=2 sw=2
 autocmd Filetype html setlocal ts=2 sts=2 sw=2
