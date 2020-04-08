@@ -42,6 +42,12 @@ fi
 alias grep='grep --color=auto'
 alias ag='grep --color=always -Hrn'
 
+# New Virtualenv
+nvenv () {
+  python3 -m virtualenv $@ .venv
+  source .venv/bin/activate
+}
+
 # Make and valgrind through less
 makel () {
     make "$@" 2>&1 | less -r
@@ -59,7 +65,7 @@ tmpd () {
   cd "$(mktemp -d)"
 }
 
-alias youtube-dl="youtube-dl --no-call-home --no-cache-dir -x --audio-format mp3 --add-metadata --audio-quality 0 --restrict-filenames --yes-playlist --ignore-errors"
+alias youtube-dl="python3.7 -m youtube_dl --no-call-home --no-cache-dir -x --audio-format mp3 --add-metadata --audio-quality 0 --restrict-filenames --yes-playlist --ignore-errors"
 
 alias ssh_proxy="ssh -nNT -D 9050"
 
@@ -237,8 +243,6 @@ function randstr() {
   python3 -c 'import os, hashlib; print(hashlib.sha384(os.urandom(int(4096 / 8))).hexdigest())'
 }
 
-export REACT_EDITOR=none
-
 # Add to path
 # if which ruby >/dev/null && which gem >/dev/null; then
 #  export PATH="$(ruby -rubygems -e 'puts Gem.user_dir')/bin:$PATH"
@@ -265,6 +269,10 @@ for CURR in ${ADD_PATH[@]}; do
         export PATH="$CURR:$PATH"
     fi
 done
+
+# For react scripts
+export BROWSER=none
+export REACT_EDITOR=none
 
 # Source all the files that need to be sourced
 for file in $(ls -a ${HOME} | grep '_source'); do
