@@ -1,4 +1,4 @@
-Dot Files
+Dot Files: 
 ---
 
 These are my dot files, long may they reign.
