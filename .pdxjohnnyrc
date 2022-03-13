@@ -270,6 +270,9 @@ for CURR in ${ADD_PATH[@]}; do
     fi
 done
 
+# For asciinema https://github.com/asciinema/asciinema/issues/206
+export LC_ALL=${LANG}
+
 # For react scripts
 export BROWSER=none
 export REACT_EDITOR=none
