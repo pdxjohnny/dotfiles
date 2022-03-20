@@ -4,8 +4,8 @@ if [[ "x${TMUX}" == "x" ]]; then
   tmux ls
   exit_code=$?
   if [[ "x${exit_code}" == "x0" ]]; then
-    $PYTHON -m asciinema rec --idle-time-limit 0.5 --title "$(date +%4Y-%m-%d-%H-%M-%ss)" --command "tmux a" >(xz --stdout - > "$HOME/asciinema/rec-$(date +%4Y-%m-%d-%H-%M-%ss).json.xz")
+    $PYTHON -m asciinema rec --idle-time-limit 0.5 --title "$(date +%4Y-%m-%d-%H-%M-%ss)" --command "tmux a" >(xz --stdout - > "$HOME/asciinema/rec-$(hostname)-$(date +%4Y-%m-%d-%H-%M-%ss).json.xz")
   else
-    $PYTHON -m asciinema rec --idle-time-limit 0.5 --title "$(date +%4Y-%m-%d-%H-%M-%ss)" --command "tmux" >(xz --stdout - > "$HOME/asciinema/rec-$(date +%4Y-%m-%d-%H-%M-%ss).json.xz")
+    $PYTHON -m asciinema rec --idle-time-limit 0.5 --title "$(date +%4Y-%m-%d-%H-%M-%ss)" --command "tmux" >(xz --stdout - > "$HOME/asciinema/rec-$(hostname)-$(date +%4Y-%m-%d-%H-%M-%ss).json.xz")
   fi
 fi
