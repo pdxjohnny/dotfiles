@@ -1,11 +1,10 @@
 execute pathogen#infect()
 set encoding=utf-8
 syntax on
-set bg=dark
-
-" setlocal spell spelllang=en_us
 
 autocmd BufWritePre *.py execute ':Black'
+
+" setlocal spell spelllang=en_us
 
 set nofoldenable    " disable folding
 set nohlsearch
@@ -31,7 +30,7 @@ set shiftwidth=2
 set expandtab
 set modeline
 set softtabstop=2
-" set bg=dark
+set bg=dark
 
 let dart_format_on_save=1
 let dart_html_in_string=v:true

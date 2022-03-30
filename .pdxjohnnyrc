@@ -8,8 +8,8 @@
 
 # History config
 unset HISTFILESIZE
-export HISTSIZE=1000000
-export HISTFILESIZE=1000000
+export HISTSIZE=-1
+export HISTFILESIZE=-1
 shopt -s histappend
 export PROMPT_COMMAND='history -a'
 export HISTCONTROL=ignoredups
@@ -67,6 +67,11 @@ tmpd () {
 
 alias youtube-dl="python3.7 -m youtube_dl --no-call-home --no-cache-dir -x --audio-format mp3 --add-metadata --audio-quality 0 --restrict-filenames --yes-playlist --ignore-errors"
 
+nvenv () {
+  python3 -m virtualenv .venv
+  . .venv/bin/activate
+}
+
 alias ssh_proxy="ssh -nNT -D 9050"
 
 # Add ll
@@ -90,13 +95,13 @@ export EDITOR=vim
 export GPG_TTY=$(tty)
 
 # Go config
-export GOPATH="${HOME}/Documents/go"
+# export GOPATH="${HOME}/Documents/go"
 # export GOROOT="${HOME}/.local/go"
-export GOBIN="${GOPATH}/bin"
-alias goh="cd ${GOPATH}/src/github.com/pdxjohnny"
-if [ -d $GOBIN ]; then
-  export PATH="$PATH:$GOBIN"
-fi
+# export GOBIN="${GOPATH}/bin"
+# alias goh="cd ${GOPATH}/src/github.com/pdxjohnny"
+# if [ -d $GOBIN ]; then
+#   export PATH="$PATH:$GOBIN"
+# fi
 
 # bin config
 export PDXJOHNNY_BIN="${HOME}/.bin"
@@ -182,7 +187,37 @@ export ANDROID_HOME="${HOME}/Android/Sdk"
 # For clang-format
 alias clang-format="clang-format -i -style=llvm"
 
-alias youtube-dl="youtube-dl --no-call-home --no-cache-dir -x --audio-format mp3 --add-metadata --audio-quality 0 --restrict-filenames --yes-playlist --ignore-errors"
+lanip() {
+  ip a | grep -v inet6 | grep inet | awk '{print $2}' | sed 's/\/.*//g' | sort | grep -Ev '::1|127\..*|172\..*' | head -n 1
+}
+
+httpok() {
+  echo -e 'HTTP/1.0 200 OK\n'
+}
+
+httpcat() {
+  PORT=${PORT:-"8080"}
+  echo "Listening on http://$(lanip):${PORT}"
+  nc -lp "${PORT}"
+}
+
+tmux_non_active_pane_indexes() {
+  tmux list-pane | grep -v active | sed -e 's/:.*//g'
+}
+
+open_files_in_panes() {
+  for file in "$@"; do
+    tmux split-window -h "vim ${file}"
+    tmux set-layout tiled
+  done
+}
+
+close_all_panes() {
+   for pane in $(tmux_non_active_pane_indexes); do
+     pane=$(tmux_non_active_pane_indexes | head -n 1)
+     tmux kill-pane -t $pane
+   done
+}
 
 # For mbed
 if [ -f "/bin/arm-none-eabi-gcc" ]; then
@@ -243,10 +278,6 @@ function randstr() {
   python3 -c 'import os, hashlib; print(hashlib.sha384(os.urandom(int(4096 / 8))).hexdigest())'
 }
 
-# Add to path
-# if which ruby >/dev/null && which gem >/dev/null; then
-#  export PATH="$(ruby -rubygems -e 'puts Gem.user_dir')/bin:$PATH"
-#fi
 if [ -f "$HOME/.cargo/env" ]; then
   source $HOME/.cargo/env
 fi

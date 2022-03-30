@@ -1,2 +1,2 @@
 # Set machines version of python here
-PYTHON="python"
+PYTHON="python3.7"
