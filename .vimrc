@@ -5,7 +5,7 @@ set bg=dark
 
 " setlocal spell spelllang=en_us
 
-autocmd BufWritePre *.py execute ':Black'
+" autocmd BufWritePre *.py execute ':Black'
 
 set nofoldenable    " disable folding
 set nohlsearch
