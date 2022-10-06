@@ -278,6 +278,9 @@ export LC_ALL=${LANG}
 export BROWSER=none
 export REACT_EDITOR=none
 
+# For alice
+alias herstory='history'
+
 # Source all the files that need to be sourced
 for file in $(ls -a ${HOME} | grep '_source'); do
     source "${HOME}/$file"
