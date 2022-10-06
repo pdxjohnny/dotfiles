@@ -41,6 +41,7 @@ fi
 # Grep colors
 alias grep='grep --color=auto'
 alias ag='grep --color=always -Hrn'
+alias ll='ls -lAF'
 
 # New Virtualenv
 nvenv () {
