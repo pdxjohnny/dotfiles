@@ -281,6 +281,11 @@ export REACT_EDITOR=none
 # For alice
 alias herstory='history'
 
+# Homedir venv
+if [ -f "${HOME}/.local/.venv/bin/activate" ]; then
+  . "${HOME}/.local/.venv/bin/activate"
+fi
+
 # Source all the files that need to be sourced
 for file in $(ls -a ${HOME} | grep '_source'); do
     source "${HOME}/$file"
