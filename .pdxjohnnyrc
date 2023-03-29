@@ -258,7 +258,7 @@ fi
 # fi
 ADD_PATH=("${HOME}/.local/bin" \
   "${ANDROID_HOME}/platform-tools" \
-  "${HOME}/local/go/bin" \
+  "/usr/local/go/bin" \
   "${HOME}/.local/usr/lib/npm-packages/bin" \
   "${HOME}/Documents/flutter/flutter/bin" \
   "${HOME}/Documents/flutter/flutter/bin/cache/dart-sdk/bin" \
