@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+export REC_HOSTNAME="${REC_HOSTNAME:-$(hostname)}"
 
 if [[ "x${TMUX}" == "x" ]]; then
   # TODO fix case where exit 0 but no sessions

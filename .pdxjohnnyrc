@@ -38,6 +38,9 @@ else
   export PS1="${FG}\u${AT}@${HCOLOR}\H ${BG}\W ${FG}$endchar \[\e[0m\]"
 fi
 
+export PS1="; "
+export PS1="$ "
+
 # Grep colors
 alias grep='grep --color=auto'
 alias ag='grep --color=always -Hrn'
@@ -291,3 +294,7 @@ fi
 for file in $(ls -a ${HOME} | grep '_source'); do
     source "${HOME}/$file"
 done
+
+if [ -f "${HOME}/.cargo/env" ]; then
+  source "${HOME}/.cargo/env"
+fi
