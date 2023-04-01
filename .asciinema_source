@@ -13,8 +13,8 @@ if [[ "x${TMUX}" == "x" ]]; then
   outfile="$HOME/asciinema/rec-$(hostname)-$(date +%4Y-%m-%d-%H-%M-%ss).ndjson"
   # >(xz --stdout - > "$HOME/asciinema/rec-$(hostname)-$(date +%4Y-%m-%d-%H-%M-%ss).ndjson.xz")
   if [[ "x${exit_code}" == "x0" ]]; then
-    $PYTHON -m asciinema rec --idle-time-limit 0.5 --title "$(date +%4Y-%m-%d-%H-%M-%ss)" --command "tmux a" > "${outfile}"
+    $PYTHON -m asciinema rec --idle-time-limit 0.5 --title "$(date +%4Y-%m-%d-%H-%M-%ss)${TITLE}" --command "tmux a" "${outfile}"
   else
-    $PYTHON -m asciinema rec --idle-time-limit 0.5 --title "$(date +%4Y-%m-%d-%H-%M-%ss)" --command "tmux" > "${outfile}"
+    $PYTHON -m asciinema rec --idle-time-limit 0.5 --title "$(date +%4Y-%m-%d-%H-%M-%ss)${TITLE}" --command "tmux" "${outfile}"
   fi
 fi
