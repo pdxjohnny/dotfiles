@@ -299,3 +299,6 @@ done
 if [ -f "${HOME}/.cargo/env" ]; then
   source "${HOME}/.cargo/env"
 fi
+
+export NO_PROXY="$(OIFS="$IFS"; IFS=$'\n'; array=($(ip a | grep inet\ | awk '{print $2}' | sed -e 's/\/.*//g' | sort | uniq)); IFS="$OIFS"; array+=(${NO_PROXY}); (export IFS=','; echo "${array[*]}"))"
+export no_proxy="$(OIFS="$IFS"; IFS=$'\n'; array=($(ip a | grep inet\ | awk '{print $2}' | sed -e 's/\/.*//g' | sort | uniq)); IFS="$OIFS"; array+=(${no_proxy}); (export IFS=','; echo "${array[*]}"))"
