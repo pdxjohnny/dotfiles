@@ -262,6 +262,7 @@ fi
 ADD_PATH=("${HOME}/.local/bin" \
   "${ANDROID_HOME}/platform-tools" \
   "/usr/local/go/bin" \
+  "${HOME}/.local/node_modules/.bin" \
   "${HOME}/.local/usr/lib/npm-packages/bin" \
   "${GOBIN}" \
   "${HOME}/Documents/flutter/flutter/bin" \
@@ -302,3 +303,10 @@ fi
 
 export NO_PROXY="$(OIFS="$IFS"; IFS=$'\n'; array=($(ip a | grep inet\ | awk '{print $2}' | sed -e 's/\/.*//g' | sort | uniq)); IFS="$OIFS"; array+=(${NO_PROXY}); (export IFS=','; echo "${array[*]}"))"
 export no_proxy="$(OIFS="$IFS"; IFS=$'\n'; array=($(ip a | grep inet\ | awk '{print $2}' | sed -e 's/\/.*//g' | sort | uniq)); IFS="$OIFS"; array+=(${no_proxy}); (export IFS=','; echo "${array[*]}"))"
+
+
+function git_grep_and_edit {
+  local FILE=$(git grep -n "$@" | sed -e 's/:.*//g' | head -n ${RESULT_NUM:-1} | tail -n 1);
+  local LINE_NO=$(git grep -n "$@" | sed -e 's/:/__HELPER_LINENO_REPLACE__/2' | sed -e 's/__HELPER_LINENO_REPLACE__.*//g' -e 's/.*://g' | head -n ${RESULT_NUM:-1} | tail -n 1);
+  vim "+${LINE_NO}" "${FILE}";
+}
