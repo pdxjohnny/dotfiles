@@ -1,0 +1,51 @@
+image-container-manifest-example () {
+    cat <<'EOF'
+{
+  "branch": "main",
+  "build_args": "[[\"key0\", \"value0\"], [\"key1\", \"value1\"]]",
+  "commit": "72a75511d7840d4062741185ec6879b585ee8c07",
+  "dockerfile": "FROM python:3.11\nWORKDIR /usr/src/scitt-api-emulator\nRUN set -x && export KEYRING=/usr/share/keyrings/nodesource.gpg && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource.gpg.key | gpg --dearmor | tee \"$KEYRING\" >/dev/null && gpg --no-default-keyring --keyring \"$KEYRING\" --list-keys && chmod a+r /usr/share/keyrings/nodesource.gpg && . /usr/lib/os-release && export VERSION=node_20.x && export DISTRO=\"${VERSION_CODENAME}\" && echo \"deb [signed-by=$KEYRING] https://deb.nodesource.com/$VERSION $DISTRO main\" | tee /etc/apt/sources.list.d/nodesource.list && echo \"deb-src [signed-by=$KEYRING] https://deb.nodesource.com/$VERSION $DISTRO main\" | tee -a /etc/apt/sources.list.d/nodesource.list && apt-get update -y && apt-get install -y nodejs jq && rm -rf /var/apt/lists/* && mkdir -vp /opt/nodemon && cd /opt/nodemon && npm install nodemon && echo 'export PATH=$PATH:/opt/nodemon/node_modules/.bin' >> ~/.bashrc\nENV PATH=\"/opt/nodemon/node_modules/.bin:$PATH\"\nCOPY setup.py ./\nRUN pip install --no-cache-dir -e .[oidc,federation-activitypub-bovine]\nCOPY . .\nRUN pip install --no-cache-dir -e .[oidc,federation-activitypub-bovine]\nCMD scitt-emulator server --workspace workspace/ --tree-alg CCF --middleware scitt_emulator.federation_activitypub_bovine:SCITTFederationActivityPubBovine --middleware-config-path federation_workspace/config.json",
+  "image_name": "scitt-api-emulator",
+  "owner": "scitt-community",
+  "repository": "scitt-api-emulator"
+}
+EOF
+}
+
+image-container-manifest-dockerfile () {
+  jq -r '.dockerfile'
+}
+
+image-container-manifest-dockerfile-update () {
+  manifest_path="${1}"
+  export manifest="$(cat ${manifest_path})" && dockerfile="$(cat /dev/stdin)" jq -r '.dockerfile = env.dockerfile' <(echo "${manifest}") | tee ${manifest_path}
+}
+
+image-container-manifest-build () {
+  export manifest="$(cat /dev/stdin)"
+  owner="$(jq -r -n 'env.manifest | fromjson | .owner')"
+  repository="$(jq -r -n 'env.manifest | fromjson | .repository')"
+  branch="$(jq -r -n 'env.manifest | fromjson | .branch')"
+  commit="$(jq -r -n 'env.manifest | fromjson | .commit')"
+  dockerfile="$(jq -r -n 'env.manifest | fromjson | .dockerfile')"
+  image_name="$(jq -r -n 'env.manifest | fromjson | .image_name')"
+  declare -a build_args
+  while IFS=$'\n' read -r line; do
+    build_args[${#build_args[@]}]="--build-arg"
+    build_args[${#build_args[@]}]="${line}"
+  done < <(jq -n -r '[env.manifest | fromjson | .build_args | fromjson | .[] | (.[0] + "=" + .[1])] | join("\n")')
+  unset manifest
+
+  (tempdir="$(mktemp -d)" \
+  && trap "rm -rf ${tempdir}" EXIT \
+  && export TARGET_DIR="${tempdir}" \
+  && export TARGET_REPO_URL="https://github.com/${owner}/${repository}" \
+  && export TARGET_COMMIT="${commit}" \
+  && mkdir -p "${TARGET_DIR}" \
+  && cd "${TARGET_DIR}" \
+  && git init \
+  && git remote add origin "${TARGET_REPO_URL}" \
+  && git fetch origin "${TARGET_COMMIT}" --depth 1 \
+  && git reset --hard "${TARGET_COMMIT}" \
+  && echo "${dockerfile}" | podman build --progress plain "${build_args[@]}" -t "${image_name}" -f - "${tempdir}")
+}
