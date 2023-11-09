@@ -1,3 +1,5 @@
+# Usage: https://asciinema.org/a/620168
+
 image-container-manifest-example () {
     cat <<'EOF'
 {
