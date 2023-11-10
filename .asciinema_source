@@ -19,7 +19,7 @@ if [[ "x${TMUX}" == "x" ]]; then
   fi
 fi
 
-asciinema_upload_last() {
+asciinema-upload-last() {
   rec_file=$(ls ${HOME}/asciinema/rec-$(hostname)-*.ndjson | tail -n 1)
   $PYTHON -m asciinema upload "${rec_file}"
 }
