@@ -1,12 +1,17 @@
 # Usage: https://asciinema.org/a/620168
 
+CONTAINER_CLI="podman"
+if which docker 1>/dev/null 2>&1; then
+  CONTAINER_CLI="docker"
+fi
+
 image-container-manifest-example () {
     cat <<'EOF'
 {
   "branch": "main",
-  "build_args": "[[\"key0\", \"value0\"], [\"key1\", \"value1\"]]",
+  "build_args": "[[\"TREE_ALG\", \"CCF\"], [\"key1\", \"va 'l feed asdf ue1\"]]",
   "commit": "72a75511d7840d4062741185ec6879b585ee8c07",
-  "dockerfile": "FROM python:3.11\nWORKDIR /usr/src/scitt-api-emulator\nRUN set -x && export KEYRING=/usr/share/keyrings/nodesource.gpg && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource.gpg.key | gpg --dearmor | tee \"$KEYRING\" >/dev/null && gpg --no-default-keyring --keyring \"$KEYRING\" --list-keys && chmod a+r /usr/share/keyrings/nodesource.gpg && . /usr/lib/os-release && export VERSION=node_20.x && export DISTRO=\"${VERSION_CODENAME}\" && echo \"deb [signed-by=$KEYRING] https://deb.nodesource.com/$VERSION $DISTRO main\" | tee /etc/apt/sources.list.d/nodesource.list && echo \"deb-src [signed-by=$KEYRING] https://deb.nodesource.com/$VERSION $DISTRO main\" | tee -a /etc/apt/sources.list.d/nodesource.list && apt-get update -y && apt-get install -y nodejs jq && rm -rf /var/apt/lists/* && mkdir -vp /opt/nodemon && cd /opt/nodemon && npm install nodemon && echo 'export PATH=$PATH:/opt/nodemon/node_modules/.bin' >> ~/.bashrc\nENV PATH=\"/opt/nodemon/node_modules/.bin:$PATH\"\nCOPY setup.py ./\nRUN pip install --no-cache-dir -e .[oidc,federation-activitypub-bovine]\nCOPY . .\nRUN pip install --no-cache-dir -e .[oidc,federation-activitypub-bovine]\nCMD scitt-emulator server --workspace workspace/ --tree-alg CCF --middleware scitt_emulator.federation_activitypub_bovine:SCITTFederationActivityPubBovine --middleware-config-path federation_workspace/config.json",
+  "dockerfile": "FROM python:3.11\n\nWORKDIR /usr/src/scitt-api-emulator\n\nRUN set -x  \\\n  && export KEYRING=/usr/share/keyrings/nodesource.gpg  \\\n  && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource.gpg.key | gpg --dearmor | tee \"$KEYRING\" >/dev/null  \\\n  && gpg --no-default-keyring --keyring \"$KEYRING\" --list-keys  \\\n  && chmod a+r /usr/share/keyrings/nodesource.gpg  \\\n  && . /usr/lib/os-release  \\\n  && export VERSION=node_20.x  \\\n  && export DISTRO=\"${VERSION_CODENAME}\"  \\\n  && echo \"deb [signed-by=$KEYRING] https://deb.nodesource.com/$VERSION $DISTRO main\" | tee /etc/apt/sources.list.d/nodesource.list  \\\n  && echo \"deb-src [signed-by=$KEYRING] https://deb.nodesource.com/$VERSION $DISTRO main\" | tee -a /etc/apt/sources.list.d/nodesource.list  \\\n  && apt-get update -y  \\\n  && apt-get install -y nodejs jq  \\\n  && rm -rf /var/apt/lists/*  \\\n  && mkdir -vp /opt/nodemon  \\\n  && cd /opt/nodemon  \\\n  && npm install nodemon  \\\n  && echo 'export PATH=$PATH:/opt/nodemon/node_modules/.bin' >> ~/.bashrc\n\nENV PATH=\"/opt/nodemon/node_modules/.bin:$PATH\"\n\nCOPY setup.py ./\n\nRUN pip install --no-cache-dir -e .[oidc,federation-activitypub-bovine]\n\nCOPY . .\n\nRUN pip install --no-cache-dir -e .[oidc,federation-activitypub-bovine]\n\nSHELL [\"bash\", \"-xeuo\", \"pipefail\", \"-c\"]\n\nARG FQDN=scitt\nENV FQDN=${FQDN}\n\nRUN mkdir federation_workspace \\\n  && grep -B 1 -A 9 '\"handle_name\": \"alice\"' docs/federation_activitypub.md \\\n    | jq '.following= {} | .fqdn = env.FQDN | .workspace = env.PWD + \"/federation_workspace\" | .bovine_db_url = \"sqlite://\" + env.PWD + \"/federation_workspace/bovine.sqlite3\"' \\\n    | tee federation_workspace/config.json\n\nARG TREE_ALG\nENV tree_alg=${TREE_ALG}\n\nCMD scitt-emulator server  \\\n  --port \"${PORT:-80}\" \\\n  --workspace workspace/  \\\n  --tree-alg \"${tree_alg}\"  \\\n  --middleware scitt_emulator.federation_activitypub_bovine:SCITTFederationActivityPubBovine  \\\n  --middleware-config-path federation_workspace/config.json",
   "image_name": "scitt-api-emulator",
   "owner": "scitt-community",
   "repository": "scitt-api-emulator"
@@ -38,6 +43,11 @@ image-container-manifest-build () {
   done < <(jq -n -r '[env.manifest | fromjson | .build_args | fromjson | .[] | (.[0] + "=" + .[1])] | join("\n")')
   unset manifest
 
+  if [[ "x${CONTAINER_CLI}" == "xpodman" ]]; then
+    build_args[${#build_args[@]}]="--format"
+    build_args[${#build_args[@]}]="docker"
+  fi
+
   (tempdir="$(mktemp -d)" \
   && trap "rm -rf ${tempdir}" EXIT \
   && export TARGET_DIR="${tempdir}" \
@@ -49,5 +59,5 @@ image-container-manifest-build () {
   && git remote add origin "${TARGET_REPO_URL}" \
   && git fetch origin "${TARGET_COMMIT}" --depth 1 \
   && git reset --hard "${TARGET_COMMIT}" \
-  && echo "${dockerfile}" | podman build --progress plain "${build_args[@]}" -t "${image_name}" -f - "${tempdir}")
+  && echo "${dockerfile}" | "${CONTAINER_CLI}" build --progress plain "${build_args[@]}" -t "${image_name}" -f - "${tempdir}")
 }
