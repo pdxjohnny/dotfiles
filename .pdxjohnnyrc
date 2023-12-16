@@ -287,6 +287,9 @@ export REACT_EDITOR=none
 # For alice
 alias herstory='history'
 
+# Quick re-exec of bash, useful for re-tmuxing to asciinema
+alias b='exec bash'
+
 # Homedir venv
 if [ -f "${HOME}/.local/.venv/bin/activate" ]; then
   . "${HOME}/.local/.venv/bin/activate"
