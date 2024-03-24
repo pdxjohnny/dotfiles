@@ -270,7 +270,9 @@ ADD_PATH=("${HOME}/.local/bin" \
   "${HOME}/.pub-cache/bin" \
   "${HOME}/.gem/ruby/2.6.0/bin" \
   "${HOME}/.pyenv/versions/3.7.2/bin/" \
-  "${HOME}/.yarn/bin")
+  "${HOME}/.yarn/bin" \
+  "${HOME}/.cargo/bin" \
+  "${HOME}/.deno/bin")
 for CURR in ${ADD_PATH[@]}; do
     if [ -d $CURR ]; then
         export PATH="$CURR:$PATH"
