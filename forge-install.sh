@@ -169,7 +169,7 @@ export PYTHON="${PYTHON:-${DEFAULT_PYTHON}}"
 
 referesh_role_id() {
   export DIRECTUS_ADMIN_ROLE_ID=$(echo 'SELECT id from directus_roles;' \
-                                  | sqlite3 ${HOME}/.local/directus.sqlite3 2>&1 \
+                                  | sqlite3 ${HOME}/.local/directus.sqlite3 \
                                   | tee ${HOME}/.local/directus_admin_role_id.txt)
 }
 
