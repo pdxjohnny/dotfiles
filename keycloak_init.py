@@ -7,13 +7,16 @@ from keycloak import KeycloakOpenIDConnection
 from keycloak.exceptions import KeycloakGetError
 
 
+import snoop
+
+@snoop
 def create_realm_and_assign_admin(args):
     keycloak_connection = KeycloakOpenIDConnection(
         server_url=args.server_url,
         username=args.admin_username,
         password=args.admin_password,
         realm_name="master",
-        user_realm_name="only_if_other_realm_than_master",
+        user_realm_name=args.realm_name,
         client_id="my_client",
         client_secret_key="client-secret",
         verify=True,
