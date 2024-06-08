@@ -6,7 +6,7 @@ export DEFAULT_PYTHON="$(which python)"
 export GITEA_WORK_DIR="${HOME}/.local/forgejo"
 export PYTHON="${PYTHON:-${DEFAULT_PYTHON}}"
 
-"${PYTHON}" -m pip install pyyaml keyring
+"${PYTHON}" -m pip install pyyaml keyring beautifulsoup4
 
 set +e
 
@@ -42,7 +42,7 @@ WantedBy=default.target
 EOF
 
 mkdir -p "${HOME}/.local/forgejo-install/"
-export INIT_YAML_PATH="$HOME/.local/forgejo-install/init.yaml"
+export INIT_YAML_PATH="${HOME}/.local/forgejo-install/init.yaml"
 tee "${INIT_YAML_PATH}" <<EOF
 db_type: 'sqlite3'
 db_host: '127.0.0.1:3306'
@@ -81,17 +81,22 @@ admin_passwd: '${FORGEJO_PASSWORD}'
 admin_confirm_passwd: '${FORGEJO_PASSWORD}'
 EOF
 
-# TODO TODO TODO
-echo TODO Disable user creation and create admin user within init.yaml
-# TODO TODO TODO
-
-export SIGN_UP_YAML_PATH="$HOME/.local/forgejo-install/sign_up.yaml"
-tee "${SIGN_UP_YAML_PATH}" <<EOF
+export FORGEJO_COOKIE_JAR_PATH="${HOME}/.local/forgejo-install/curl-cookie-jar"
+export LOGIN_YAML_PATH="${HOME}/.local/forgejo-install/login.yaml"
+tee "${LOGIN_YAML_PATH}" <<EOF
 _csrf: CSRF_TOKEN
-email: alice@chadig.com
-password: maryisgod
-retype: maryisgod
-user_name: alice
+user_name: '${FORGEJO_USERNAME}'
+password: '${FORGEJO_PASSWORD}'
+remember: 'on'
+EOF
+
+export OAUTH2_APP_CLIENT_VALUES_HTML_PATH="${HOME}/.local/forgejo-install/client-values.html"
+export NEW_OAUTH2_APPLICATION_YAML_PATH="${HOME}/.local/forgejo-install/directus_oauth2_application.yaml"
+tee "${NEW_OAUTH2_APPLICATION_YAML_PATH}" <<EOF
+_csrf: CSRF_TOKEN
+application_name: 'Directus'
+redirect_uris: https://${DIRECTUS_FQDN}/auth/login/forgejo/callback
+confidential_client: 'on'
 EOF
 
 touch $HOME/.local/share/systemd/user/forge.service.sh
@@ -124,17 +129,26 @@ cleanup_docker_container_ids() {
   done
 }
 
+export FORGEJO_COOKIE_JAR_PATH="${HOME}/.local/forgejo-install/curl-cookie-jar"
+export LOGIN_YAML_PATH="${HOME}/.local/forgejo-install/login.yaml"
+export OAUTH2_APP_CLIENT_VALUES_HTML_PATH="${HOME}/.local/forgejo-install/client-values.html"
+export NEW_OAUTH2_APPLICATION_YAML_PATH="${HOME}/.local/forgejo-install/directus_oauth2_application.yaml"
+export INIT_YAML_PATH="${HOME}/.local/forgejo-install/init.yaml"
+export GITEA_WORK_DIR="${HOME}/.local/forgejo"
+
+cleanup_files() {
+  return
+  rm -fv "${INIT_YAML_PATH}" "${OAUTH2_APP_CLIENT_VALUES_HTML_PATH}" "${NEW_OAUTH2_APPLICATION_YAML_PATH}" "${FORGEJO_COOKIE_JAR_PATH}" "${LOGIN_YAML_PATH}"
+}
+
 cleanup() {
   set +e
+  cleanup_files
   cleanup_pids
   cleanup_docker_container_ids
 }
 
 trap cleanup EXIT
-
-export SIGN_UP_YAML_PATH="${HOME}/.local/forgejo-install/sign_up.yaml"
-export INIT_YAML_PATH="${HOME}/.local/forgejo-install/init.yaml"
-export GITEA_WORK_DIR="${HOME}/.local/forgejo"
 
 EOF
 tee -a $HOME/.local/share/systemd/user/forge.service.sh <<EOF
@@ -188,13 +202,72 @@ check_forgejo_initialized_and_running() {
   elif [ "x${STATUS_CODE}" = "x405" ]; then
     echo "checking-if-forgejo-need-first-time-init";
     query_params=$("${PYTHON}" -c 'import sys, urllib.parse, yaml; print(urllib.parse.urlencode(yaml.safe_load(sys.stdin)))' < "${INIT_YAML_PATH}");
-    curl -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}";
-    # curl -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}" > /dev/null;
-    echo "forgejo-first-time-init-complete";
+    curl -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}" 1>/dev/null;
+
+    # https://docs.gitea.com/next/development/api-usage#generating-and-listing-api-tokens
+    # curl -H "X-Gitea-OTP: 123456" --url https://yourusername:yourpassword@gitea.your.host/api/v1/users/yourusername/tokens
+    #
+    FORGEJO_USERNAME=$("${PYTHON}" -m keyring get "${USER}" "${USER}.forgejo.username")
+    FORGEJO_EMAIL=$("${PYTHON}" -m keyring get "${USER}" "${USER}.forgejo.email")
+    FORGEJO_PASSWORD=$("${PYTHON}" -m keyring get "${USER}" "${USER}.forgejo.password")
+
+    get_forgejo_token() {
+      curl -sf -u "${FORGEJO_USERNAME}:${FORGEJO_PASSWORD}" -H "Content-Type: application/json" -d '{"name": "forgejo-install-auth-oidc-directus"}'  "https://${FORGEJO_FQDN}/api/v1/users/${FORGEJO_USERNAME}/tokens" | jq -r '.sha1'
+    }
+    FORGEJO_TOKEN=$(get_forgejo_token)
+    while [ "x${FORGEJO_TOKEN}" = "x" ]; do
+      sleep 0.1
+      FORGEJO_TOKEN=$(get_forgejo_token)
+    done
+
+    query_params=$("${PYTHON}" -c 'import sys, urllib.parse, yaml; print(urllib.parse.urlencode(yaml.safe_load(sys.stdin)))' < "${INIT_YAML_PATH}");
+    curl -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}" 1>/dev/null;
+
+    get_login_crsf_token() {
+      curl -H "Authorization: Bearer ${FORGEJO_TOKEN}" "https://${FORGEJO_FQDN}/user/login" | grep csrfToken | awk '{print $NF}' | sed -e "s/'//g" -e 's/,//g'
+    }
+
+    CSRF_TOKEN=$(get_login_crsf_token);
+    while [ "x${CSRF_TOKEN}" == "x" ]; do
+      CSRF_TOKEN=$(get_login_crsf_token);
+      sleep 10;
+    done
+    query_params=$(
+      sed -e "s/CSRF_TOKEN/\"${CSRF_TOKEN}\"/g" "${LOGIN_YAML_PATH}" \
+        | "${PYTHON}" -c 'import sys, urllib.parse, yaml; print(urllib.parse.urlencode(yaml.safe_load(sys.stdin)))'
+    )
+    curl -L --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}/user/login" > /dev/null
+
+    sleep 2000
+
+    get_oauth_app_crsf_token() {
+      curl --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" "https://${FORGEJO_FQDN}/admin/applications" 1>&2
+      curl --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" "https://${FORGEJO_FQDN}/admin/applications" | grep csrfToken | awk '{print $NF}' | sed -e "s/'//g" -e 's/,//g'
+    }
+
+    echo "creating-forgejo-application-directus";
+    CSRF_TOKEN=$(get_oauth_app_crsf_token);
+    while [ "x${CSRF_TOKEN}" == "x" ]; do
+      CSRF_TOKEN=$(get_oauth_app_crsf_token);
+      sleep 10;
+    done
+    query_params=$(
+      sed -e "s/CSRF_TOKEN/\"${CSRF_TOKEN}\"/g" "${NEW_OAUTH2_APPLICATION_YAML_PATH}" \
+        | "${PYTHON}" -c 'import sys, urllib.parse, yaml; print(urllib.parse.urlencode(yaml.safe_load(sys.stdin)))'
+    )
+    curl --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}/admin/applications/oauth2" | tee "${OAUTH2_APP_CLIENT_VALUES_HTML_PATH}"
+
+    echo TODO beautifulsoup
+    echo "${OAUTH2_APP_CLIENT_VALUES_HTML_PATH}"
+    bash
+
+    echo "forgejo-application-directus-oidc-init-complete";
     return 0
   fi
   return 0
 }
+
+test -f "${INIT_YAML_PATH}"
 
 set +e
 check_forgejo_initialized_and_running
@@ -205,13 +278,10 @@ while [ "x${forgejo_initialized_and_running}" = "x0" ]; do
   forgejo_initialized_and_running=$?
 done
 set -e
+echo "forgejo-first-time-init-complete";
+cleanup_files
 
 echo TODO Configure openid client_id and client_secret
-
-# https://docs.gitea.com/next/development/api-usage#generating-and-listing-api-tokens
-# curl -H "X-Gitea-OTP: 123456" --url https://yourusername:yourpassword@gitea.your.host/api/v1/users/yourusername/tokens
-#
-# curl -H "X-Gitea-OTP: 123456" --url https://yourusername:yourpassword@gitea.your.host/api/v1/users/yourusername/tokens
 
 wait_for_and_populate_directus_admin_role_id_txt &
 
