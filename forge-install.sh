@@ -138,7 +138,8 @@ export GITEA_WORK_DIR="${HOME}/.local/forgejo"
 
 cleanup_files() {
   return
-  rm -fv "${INIT_YAML_PATH}" "${OAUTH2_APP_CLIENT_VALUES_HTML_PATH}" "${NEW_OAUTH2_APPLICATION_YAML_PATH}" "${FORGEJO_COOKIE_JAR_PATH}" "${LOGIN_YAML_PATH}"
+  # rm -fv "${INIT_YAML_PATH}" "${OAUTH2_APP_CLIENT_VALUES_HTML_PATH}" "${NEW_OAUTH2_APPLICATION_YAML_PATH}" "${FORGEJO_COOKIE_JAR_PATH}" "${LOGIN_YAML_PATH}"
+  rm -fv "${INIT_YAML_PATH}" "${NEW_OAUTH2_APPLICATION_YAML_PATH}" "${FORGEJO_COOKIE_JAR_PATH}" "${LOGIN_YAML_PATH}"
 }
 
 cleanup() {
@@ -236,9 +237,8 @@ check_forgejo_initialized_and_running() {
       sed -e "s/CSRF_TOKEN/\"${CSRF_TOKEN}\"/g" "${LOGIN_YAML_PATH}" \
         | "${PYTHON}" -c 'import sys, urllib.parse, yaml; print(urllib.parse.urlencode(yaml.safe_load(sys.stdin)))'
     )
-    curl -L --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}/user/login" > /dev/null
-
-    sleep 2000
+    curl --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}/user/login" > /dev/null
+    curl --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" -v "https://${FORGEJO_FQDN}/" > /dev/null
 
     get_oauth_app_crsf_token() {
       curl --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" "https://${FORGEJO_FQDN}/admin/applications" 1>&2
@@ -246,20 +246,20 @@ check_forgejo_initialized_and_running() {
     }
 
     echo "creating-forgejo-application-directus";
-    CSRF_TOKEN=$(get_oauth_app_crsf_token);
-    while [ "x${CSRF_TOKEN}" == "x" ]; do
-      CSRF_TOKEN=$(get_oauth_app_crsf_token);
-      sleep 10;
-    done
+    # CSRF_TOKEN=$(get_oauth_app_crsf_token);
+    # while [ "x${CSRF_TOKEN}" == "x" ]; do
+    #   CSRF_TOKEN=$(get_oauth_app_crsf_token);
+    #   sleep 10;
+    # done
     query_params=$(
       sed -e "s/CSRF_TOKEN/\"${CSRF_TOKEN}\"/g" "${NEW_OAUTH2_APPLICATION_YAML_PATH}" \
         | "${PYTHON}" -c 'import sys, urllib.parse, yaml; print(urllib.parse.urlencode(yaml.safe_load(sys.stdin)))'
     )
-    curl --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}/admin/applications/oauth2" | tee "${OAUTH2_APP_CLIENT_VALUES_HTML_PATH}"
+    curl -f --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}/admin/applications/oauth2" 2>&1 | tee "${OAUTH2_APP_CLIENT_VALUES_HTML_PATH}"
 
     echo TODO beautifulsoup
     echo "${OAUTH2_APP_CLIENT_VALUES_HTML_PATH}"
-    bash
+    # bash
 
     echo "forgejo-application-directus-oidc-init-complete";
     return 0
