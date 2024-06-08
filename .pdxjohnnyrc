@@ -66,7 +66,8 @@ lessit () {
 }
 
 tmpd () {
-  cd "$(mktemp -d)"
+  mkdir -p ~/.tmp
+  cd "$(mktemp -p ~/.tmp -d)"
 }
 
 alias youtube-dl="python3.7 -m youtube_dl --no-call-home --no-cache-dir -x --audio-format mp3 --add-metadata --audio-quality 0 --restrict-filenames --yes-playlist --ignore-errors"
