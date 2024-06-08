@@ -169,7 +169,7 @@ export PYTHON="${PYTHON:-${DEFAULT_PYTHON}}"
 
 referesh_role_id() {
   export DIRECTUS_ADMIN_ROLE_ID=$(echo 'SELECT id from directus_roles;' \
-                                  | sqlite3 ${HOME}/.local/directus.sqlite3 2>(grep -v 'database is locked' | grep -v directus_roles 1>&2) \
+                                  | sqlite3 ${HOME}/.local/directus.sqlite3 2> >(grep -v 'database is locked' | grep -v directus_roles >&2) \
                                   | tee ${HOME}/.local/directus_admin_role_id.txt)
 }
 
@@ -237,12 +237,12 @@ check_forgejo_initialized_and_running() {
       sed -e "s/CSRF_TOKEN/\"${CSRF_TOKEN}\"/g" "${LOGIN_YAML_PATH}" \
         | "${PYTHON}" -c 'import sys, urllib.parse, yaml; print(urllib.parse.urlencode(yaml.safe_load(sys.stdin)))'
     )
-    curl --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}/user/login" > /dev/null
-    curl --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" -v "https://${FORGEJO_FQDN}/" > /dev/null
+    curl -b "${FORGEJO_COOKIE_JAR_PATH}" --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}/user/login" > /dev/null
+    curl -b "${FORGEJO_COOKIE_JAR_PATH}" -v "https://${FORGEJO_FQDN}/" > /dev/null
 
     get_oauth_app_crsf_token() {
-      curl --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" "https://${FORGEJO_FQDN}/admin/applications" 1>&2
-      curl --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" "https://${FORGEJO_FQDN}/admin/applications" | grep csrfToken | awk '{print $NF}' | sed -e "s/'//g" -e 's/,//g'
+      curl -b "${FORGEJO_COOKIE_JAR_PATH}" --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" "https://${FORGEJO_FQDN}/admin/applications" 1>&2
+      curl -b "${FORGEJO_COOKIE_JAR_PATH}" --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" "https://${FORGEJO_FQDN}/admin/applications" | grep csrfToken | awk '{print $NF}' | sed -e "s/'//g" -e 's/,//g'
     }
 
     echo "creating-forgejo-application-directus";
@@ -255,11 +255,14 @@ check_forgejo_initialized_and_running() {
       sed -e "s/CSRF_TOKEN/\"${CSRF_TOKEN}\"/g" "${NEW_OAUTH2_APPLICATION_YAML_PATH}" \
         | "${PYTHON}" -c 'import sys, urllib.parse, yaml; print(urllib.parse.urlencode(yaml.safe_load(sys.stdin)))'
     )
-    curl -f --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}/admin/applications/oauth2" 2>&1 | tee "${OAUTH2_APP_CLIENT_VALUES_HTML_PATH}"
+    sleep 10
+    curl -f -b "${FORGEJO_COOKIE_JAR_PATH}" -v "https://${FORGEJO_FQDN}/admin/applications" 2>&1 | tee "${OAUTH2_APP_CLIENT_VALUES_HTML_PATH}.list.html"
+    curl -f -b "${FORGEJO_COOKIE_JAR_PATH}" -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}/admin/applications/oauth2" 2>&1 | tee "${OAUTH2_APP_CLIENT_VALUES_HTML_PATH}"
 
     echo TODO beautifulsoup
     head -n 99999 "${OAUTH2_APP_CLIENT_VALUES_HTML_PATH}"
-    # bash
+
+    echo TODO https://docs.gitea.com/api/1.22/#tag/admin/operation/adminGetRunnerRegistrationToken as another systemd file
 
     echo "forgejo-application-directus-oidc-init-complete";
     return 0
