@@ -169,7 +169,7 @@ export PYTHON="${PYTHON:-${DEFAULT_PYTHON}}"
 
 referesh_role_id() {
   export DIRECTUS_ADMIN_ROLE_ID=$(echo 'SELECT id from directus_roles;' \
-                                  | sqlite3 ${HOME}/.local/directus.sqlite3 \
+                                  | sqlite3 ${HOME}/.local/directus.sqlite3 2>(grep -v 'database is locked' | grep -v directus_roles 1>&2) \
                                   | tee ${HOME}/.local/directus_admin_role_id.txt)
 }
 
@@ -258,7 +258,7 @@ check_forgejo_initialized_and_running() {
     curl -f --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}/admin/applications/oauth2" 2>&1 | tee "${OAUTH2_APP_CLIENT_VALUES_HTML_PATH}"
 
     echo TODO beautifulsoup
-    echo "${OAUTH2_APP_CLIENT_VALUES_HTML_PATH}"
+    head -n 99999 "${OAUTH2_APP_CLIENT_VALUES_HTML_PATH}"
     # bash
 
     echo "forgejo-application-directus-oidc-init-complete";
