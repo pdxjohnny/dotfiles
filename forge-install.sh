@@ -44,37 +44,37 @@ EOF
 mkdir -p "${HOME}/.local/forgejo-install/"
 export INIT_YAML_PATH="$HOME/.local/forgejo-install/init.yaml"
 tee "${INIT_YAML_PATH}" <<EOF
-db_type: sqlite3
-db_host: 127.0.0.1:3306
-db_user: forgejo
-db_passwd:
-db_name: forgejo
-ssl_mode: disable
-db_schema:
+db_type: 'sqlite3'
+db_host: '127.0.0.1:3306'
+db_user: 'forgejo'
+db_passwd: ''
+db_name: 'forgejo'
+ssl_mode: 'disable'
+db_schema: ''
 db_path: '${GITEA_WORK_DIR}/data/forgejo.db'
 app_name: '${FORGEJO_USERNAME}-forgejo'
 repo_root_path: '${GITEA_WORK_DIR}/data/forgejo-repositories'
 lfs_root_path: '${GITEA_WORK_DIR}/data/lfs'
 run_user: '${USER}'
 domain: '${FORGEJO_FQDN}'
-ssh_port: 0
-http_port: 3000
+ssh_port: '0'
+http_port: '3000'
 app_url: 'https://${FORGEJO_FQDN}/'
 log_root_path: '${GITEA_WORK_DIR}/data/log'
-enable_update_checker: on
-smtp_addr:
-smtp_port:
-smtp_from:
-smtp_user:
-smtp_passwd:
-offline_mode: on
-disable_gravatar: off
-enable_open_id_sign_in: off
-enable_open_id_sign_up: off
-default_allow_create_organization: on
-default_enable_timetracking: off
+enable_update_checker: 'on'
+smtp_addr: ''
+smtp_port: ''
+smtp_from: ''
+smtp_user: ''
+smtp_passwd: ''
+offline_mode: 'on'
+disable_gravatar: 'off'
+enable_open_id_sign_in: 'off'
+enable_open_id_sign_up: 'off'
+default_allow_create_organization: 'on'
+default_enable_timetracking: 'off'
 no_reply_address: 'noreply.${FORGEJO_FQDN}'
-password_algorithm: pbkdf2_hi
+password_algorithm: 'pbkdf2_hi'
 admin_name: '${FORGEJO_USERNAME}'
 admin_email: '${FORGEJO_EMAIL}'
 admin_passwd: '${FORGEJO_PASSWORD}'
@@ -188,9 +188,10 @@ check_forgejo_initialized_and_running() {
   elif [ "x${STATUS_CODE}" = "x405" ]; then
     echo "checking-if-forgejo-need-first-time-init";
     query_params=$("${PYTHON}" -c 'import sys, urllib.parse, yaml; print(urllib.parse.urlencode(yaml.safe_load(sys.stdin)))' < "${INIT_YAML_PATH}");
-    curl -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}" > /dev/null;
+    curl -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}";
+    # curl -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}" > /dev/null;
     echo "forgejo-first-time-init-complete";
-    return 1
+    return 0
   fi
   return 0
 }
