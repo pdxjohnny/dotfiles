@@ -1,6 +1,28 @@
 #!/usr/bin/env bash
 set -xeuo pipefail
 
+export GITEA_WORK_DIR="${HOME}/.local/forgejo"
+
+python3 -m pip install pyyaml keyring
+
+FORGEJO_USERNAME=$(python -m keyring get "${USER}" "${USER}.forgejo.username")
+if [ "x${FORGEJO_USERNAME}" = "x" ]; then
+  echo "${USER}" | python -m keyring set "${USER}" "${USER}.forgejo.username"
+fi
+
+FORGEJO_EMAIL=$(python -m keyring get "${USER}" "${USER}.forgejo.email")
+if [ "x${FORGEJO_EMAIL}" = "x" ]; then
+  git config user.email | python -m keyring set "${USER}" "${USER}.forgejo.email"
+fi
+
+FORGEJO_PASSWORD=$(python -m keyring get "${USER}" "${USER}.forgejo.password")
+if [ "x${FORGEJO_PASSWORD}" = "x" ]; then
+  python -m keyring set "${USER}" "${USER}.forgejo.password"
+fi
+
+export FORGEJO_FQDN="git.pdxjohnny.chadig.com"
+export DIRECTUS_FQDN="directus.pdxjohnny.chadig.com"
+
 mkdir -p $HOME/.local/share/systemd/user
 
 tee $HOME/.local/share/systemd/user/forge.service <<'EOF'
@@ -14,25 +36,118 @@ ExecStart=bash -c "exec ${HOME}/.local/share/systemd/user/forge.service.sh"
 WantedBy=default.target
 EOF
 
+mkdir -p "${HOME}/.local/forgejo-install/"
+export INIT_YAML_PATH="$HOME/.local/forgejo-install/init.yaml"
+tee "${INIT_YAML_PATH}" <<EOF
+db_type: sqlite3
+db_host: 127.0.0.1:3306
+db_user: forgejo
+db_passwd:
+db_name: forgejo
+ssl_mode: disable
+db_schema:
+db_path: '${GITEA_WORK_DIR}/data/forgejo.db'
+app_name: '${FORGEJO_USERNAME}-forgejo'
+repo_root_path: '${GITEA_WORK_DIR}/data/forgejo-repositories'
+lfs_root_path: '${GITEA_WORK_DIR}/data/lfs'
+run_user: '${USER}'
+domain: '${FORGEJO_FQDN}'
+ssh_port: 0
+http_port: 3000
+app_url: 'https://${FORGEJO_FQDN}/'
+log_root_path: '${GITEA_WORK_DIR}/data/log'
+enable_update_checker: on
+smtp_addr:
+smtp_port:
+smtp_from:
+smtp_user:
+smtp_passwd:
+offline_mode: on
+disable_gravatar: off
+enable_open_id_sign_in: off
+enable_open_id_sign_up: off
+default_allow_create_organization: on
+default_enable_timetracking: off
+no_reply_address: 'noreply.${FORGEJO_FQDN}'
+password_algorithm: pbkdf2_hi
+admin_name: '${FORGEJO_USERNAME}'
+admin_email: '${FORGEJO_EMAIL}'
+admin_passwd: '${FORGEJO_PASSWORD}'
+admin_confirm_passwd: '${FORGEJO_PASSWORD}'
+EOF
+
+# TODO TODO TODO
+echo TODO Disable user creation and create admin user within init.yaml
+# TODO TODO TODO
+
+export SIGN_UP_YAML_PATH="$HOME/.local/forgejo-install/sign_up.yaml"
+tee "${SIGN_UP_YAML_PATH}" <<EOF
+_csrf: CSRF_TOKEN
+email: alice@chadig.com
+password: maryisgod
+retype: maryisgod
+user_name: alice
+EOF
+
 touch $HOME/.local/share/systemd/user/forge.service.sh
 chmod 755 $HOME/.local/share/systemd/user/forge.service.sh
 tee $HOME/.local/share/systemd/user/forge.service.sh <<'EOF'
 #!/usr/bin/env bash
 set -xeuo pipefail
 
-export FORGEJO_FQDN="git.pdxjohnny.chadig.com"
-export DIRECTUS_FQDN="directus.pdxjohnny.chadig.com"
+declare -a PIDS=()
 
-rm -fv \
+new_pid() {
+  PIDS[${#PIDS[@]}]="$1"
+}
+
+cleanup_pids() {
+  for pid in "${PIDS[@]}"; do
+    kill "${pid}"
+  done
+}
+
+declare -a DOCKER_CONTAINER_IDS=()
+
+new_docker_container_id() {
+  DOCKER_CONTAINER_IDS[${#DOCKER_CONTAINER_IDS[@]}]="$1"
+}
+
+cleanup_docker_container_ids() {
+  for docker_container_id in "${DOCKER_CONTAINER_IDS[@]}"; do
+    docker kill "${docker_container_id}"
+  done
+}
+
+cleanup() {
+  set +e
+  cleanup_pids
+  cleanup_docker_container_ids
+}
+
+trap cleanup EXIT
+
+export SIGN_UP_YAML_PATH="${HOME}/.local/forgejo-install/sign_up.yaml"
+export INIT_YAML_PATH="${HOME}/.local/forgejo-install/init.yaml"
+export GITEA_WORK_DIR="${HOME}/.local/forgejo"
+
+EOF
+tee -a $HOME/.local/share/systemd/user/forge.service.sh <<EOF
+export FORGEJO_FQDN="${FORGEJO_FQDN}"
+export DIRECTUS_FQDN="${DIRECTUS_FQDN}"
+EOF
+
+# TODO TODO TODO TODO REMOVE RM -rfv TODO TODO TODO TODO
+tee -a $HOME/.local/share/systemd/user/forge.service.sh <<'EOF'
+rm -rfv \
+  "${GITEA_WORK_DIR}" \
   "${HOME}/.local/directus.sqlite3" \
   "${HOME}/.local/directus_admin_role_id.txt"
 
 referesh_role_id() {
-  set -x
   export DIRECTUS_ADMIN_ROLE_ID=$(echo 'SELECT id from directus_roles;' \
                                   | sqlite3 ${HOME}/.local/directus.sqlite3 \
                                   | tee ${HOME}/.local/directus_admin_role_id.txt)
-  set +x
 }
 
 wait_for_and_populate_directus_admin_role_id_txt() {
@@ -44,6 +159,51 @@ wait_for_and_populate_directus_admin_role_id_txt() {
   done
   set -x
 }
+
+forgejo web &
+FORGEJO_PID=$!
+new_pid "${FORGEJO_PID}"
+
+ssh -nNT -R 127.0.0.1:3000:0.0.0.0:3000 alice@scitt.unstable.chadig.com &
+FORGEJO_SSH_TUNNEL_PID=$!
+new_pid "${FORGEJO_SSH_TUNNEL_PID}"
+ssh -nNT -R 127.0.0.1:8055:0.0.0.0:8055 alice@scitt.unstable.chadig.com &
+DIRECTUS_SSH_TUNNEL_PID=$!
+new_pid "${DIRECTUS_SSH_TUNNEL_PID}"
+
+echo "awaiting-forgejo";
+until curl -I "https://${FORGEJO_FQDN}" > /dev/null 2>&1; do sleep 0.1; done;
+
+sleep 10000
+
+echo "checking-if-forgejo-need-first-time-init";
+query_params=$(python3 -c 'import sys, urllib.parse, yaml; print(urllib.parse.urlencode(yaml.safe_load(sys.stdin)))' < "${INIT_YAML_PATH}");
+curl -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}" > /dev/null;
+echo "forgejo-first-time-init-complete";
+
+get_sign_up_crsf_token() {
+  curl "${1}/user/sign_up" | grep csrfToken | awk '{print $NF}' | sed -e "s/'//g" -e 's/,//g'
+}
+
+# https://docs.gitea.com/next/development/api-usage#generating-and-listing-api-tokens
+# curl -H "X-Gitea-OTP: 123456" --url https://yourusername:yourpassword@gitea.your.host/api/v1/users/yourusername/tokens
+
+# curl -H "X-Gitea-OTP: 123456" --url https://yourusername:yourpassword@gitea.your.host/api/v1/users/yourusername/tokens
+
+echo "creating-forgejo-admin-user";
+CSRF_TOKEN=$(get_sign_up_crsf_token "https://${FORGEJO_FQDN}");
+while [ "x${CSRF_TOKEN}" == "x" ]; do
+  CSRF_TOKEN=$(get_sign_up_crsf_token "https://${FORGEJO_FQDN}");
+  sleep 0.1;
+done
+query_params=$(
+  sed -e "s/CSRF_TOKEN/\"${CSRF_TOKEN}\"/g" "${SIGN_UP_YAML_PATH}" \
+    | python3 -c 'import sys, urllib.parse, yaml; print(urllib.parse.urlencode(yaml.safe_load(sys.stdin)))'
+)
+curl -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}/user/sign_up" > /dev/null
+echo "forgejo-user-sign-up-complete";
+
+echo "forgejo-configured";
 
 wait_for_and_populate_directus_admin_role_id_txt &
 
@@ -67,137 +227,7 @@ DIRECTUS_CONTAINER_ID=$(docker run \
   directus/directus \
   -c \
   'set -x && node cli.js bootstrap && while [ "x$(cat admin_role_id.txt)" = "x" ]; do sleep 10; done && export AUTH_FORGEJO_DEFAULT_ROLE_ID=$(cat admin_role_id.txt) && pm2-runtime start ecosystem.config.cjs')
-
-GITEA_WORK_DIR=$HOME/.local/appdata forgejo web &
-FORGEJO_PID=$!
-
-cleanup() {
-  kill "${FORGEJO_PID}"
-  docker kill "${DIRECTUS_CONTAINER_ID}"
-}
-
-trap cleanup EXIT
-
-==> /home/pdxjohnny/Documents/python/dffml/examples/tutorials/rolling_alice/federated_forge/alice_and_bob/requests/alice/app.ini <==
-APP_NAME = Forgejo: Beyond coding. We forge.
-RUN_USER = git
-RUN_MODE = prod
-
-[repository]
-ROOT = /var/lib/gitea/git/repositories
-
-[repository.local]
-LOCAL_COPY_PATH = /tmp/gitea/local-repo
-
-[repository.upload]
-TEMP_PATH = /tmp/gitea/uploads
-
-[server]
-APP_DATA_PATH = /var/lib/gitea
-SSH_DOMAIN       = localhost
-HTTP_PORT        = 2000
-ROOT_URL         = 
-DISABLE_SSH      = false
-; In rootless gitea container only internal ssh server is supported
-START_SSH_SERVER = true
-SSH_PORT         = 2222
-SSH_LISTEN_PORT  = 2222
-BUILTIN_SSH_SERVER_USER = git
-LFS_START_SERVER = 
-
-[database]
-PATH = /var/lib/gitea/data/gitea.db
-DB_TYPE = sqlite3
-HOST    = localhost:3306
-NAME    = gitea
-USER    = root
-PASSWD  = 
-
-[session]
-PROVIDER_CONFIG = /var/lib/gitea/data/sessions
-
-[picture]
-AVATAR_UPLOAD_PATH = /var/lib/gitea/data/avatars
-REPOSITORY_AVATAR_UPLOAD_PATH = /var/lib/gitea/data/repo-avatars
-
-[attachment]
-PATH = /var/lib/gitea/data/attachments
-
-[log]
-ROOT_PATH = /var/lib/gitea/data/log
-
-[security]
-INSTALL_LOCK = false
-SECRET_KEY   = 
-REVERSE_PROXY_LIMIT = 1
-REVERSE_PROXY_TRUSTED_PROXIES = *
-
-[service]
-DISABLE_REGISTRATION = false
-REQUIRE_SIGNIN_VIEW  = false
-
-[lfs]
-PATH = /var/lib/gitea/git/lfs
-
-==> /home/pdxjohnny/Documents/python/dffml/examples/tutorials/rolling_alice/federated_forge/alice_and_bob/requests/alice/init.yaml <==
-app_name: 'Forgejo: Beyond coding. We forge.'
-app_url: http://127.0.0.1:2000/
-charset: utf8
-db_host: localhost:3306
-db_name: gitea
-db_path: /var/lib/gitea/data/gitea.db
-db_type: sqlite3
-db_user: root
-default_allow_create_organization: 'on'
-default_enable_timetracking: 'on'
-domain: alice_forgejo_server
-enable_federated_avatar: 'on'
-enable_open_id_sign_in: 'on'
-enable_open_id_sign_up: 'on'
-http_port: '2000'
-lfs_root_path: /var/lib/gitea/git/lfs
-log_root_path: /var/lib/gitea/data/log
-no_reply_address: noreply.localhost
-password_algorithm: pbkdf2_hi
-repo_root_path: /var/lib/gitea/git/repositories
-run_user: git
-ssh_port: '2022'
-ssl_mode: disable
-
-==> /home/pdxjohnny/Documents/python/dffml/examples/tutorials/rolling_alice/federated_forge/alice_and_bob/requests/alice/sign_up.yaml <==
-_csrf: CSRF_TOKEN
-email: alice@chadig.com
-password: maryisgod
-retype: maryisgod
-user_name: alice
-
-==> /home/pdxjohnny/Documents/python/dffml/examples/tutorials/rolling_alice/federated_forge/alice_and_bob/requests/scripts/forgejo-first-time-init.sh <==
-echo "awaiting-forgejo";
-until curl -I "${FORGEJO_SERVICE_ROOT}" > /dev/null 2>&1; do sleep 0.1; done;
-
-echo "checking-if-forgejo-need-first-time-init";
-query_params=$(python3 -c 'import sys, urllib.parse, yaml; print(urllib.parse.urlencode(yaml.safe_load(sys.stdin)))' < /usr/src/forgejo-init/requests/init.yaml);
-curl -v -X POST --data-raw "${query_params}" "${FORGEJO_SERVICE_ROOT}" > /dev/null;
-echo "forgejo-first-time-init-complete";
-
-get_sign_up_crsf_token() {
-  curl "${1}/user/sign_up" | grep csrfToken | awk '{print $NF}' | sed -e "s/'//g" -e 's/,//g'
-}
-
-echo "creating-forgejo-admin-user";
-CSRF_TOKEN=$(get_sign_up_crsf_token "${FORGEJO_SERVICE_ROOT}");
-while [ "x${CSRF_TOKEN}" == "x" ]; do
-  CSRF_TOKEN=$(get_sign_up_crsf_token "${FORGEJO_SERVICE_ROOT}");
-  sleep 0.1;
-done
-query_params=$(
-  sed -e "s/CSRF_TOKEN/\"${CSRF_TOKEN}\"/g" /usr/src/forgejo-init/requests/sign_up.yaml \
-    | python3 -c 'import sys, urllib.parse, yaml; print(urllib.parse.urlencode(yaml.safe_load(sys.stdin)))'
-)
-curl -v -X POST --data-raw "${query_params}" "${FORGEJO_SERVICE_ROOT}/user/sign_up" > /dev/null
-echo "forgejo-user-sign-up-complete";
-
-echo "forgejo-configured";
+new_docker_container_id "${DIRECTUS_CONTAINER_ID}"
 EOF
 
 systemctl --user daemon-reload
