@@ -93,7 +93,6 @@ password: '${FORGEJO_PASSWORD}'
 remember: 'on'
 EOF
 
-export OAUTH2_APP_CLIENT_VALUES_HTML_PATH="${HOME}/.local/forgejo-install/client-values.html"
 export NEW_OAUTH2_APPLICATION_YAML_PATH="${HOME}/.local/forgejo-install/directus_oauth2_application.yaml"
 tee "${NEW_OAUTH2_APPLICATION_YAML_PATH}" <<EOF
 name: 'Directus'
@@ -136,14 +135,12 @@ export INSTALL_WORK_DIR="${HOME}/.local/forgejo-install"
 . "${INSTALL_WORK_DIR}/.venv/bin/activate"
 export FORGEJO_COOKIE_JAR_PATH="${HOME}/.local/forgejo-install/curl-cookie-jar"
 export LOGIN_YAML_PATH="${HOME}/.local/forgejo-install/login.yaml"
-export OAUTH2_APP_CLIENT_VALUES_HTML_PATH="${HOME}/.local/forgejo-install/client-values.html"
 export NEW_OAUTH2_APPLICATION_YAML_PATH="${HOME}/.local/forgejo-install/directus_oauth2_application.yaml"
 export INIT_YAML_PATH="${HOME}/.local/forgejo-install/init.yaml"
 export GITEA_WORK_DIR="${HOME}/.local/forgejo"
 
 cleanup_files() {
   return
-  # rm -fv "${INIT_YAML_PATH}" "${OAUTH2_APP_CLIENT_VALUES_HTML_PATH}" "${NEW_OAUTH2_APPLICATION_YAML_PATH}" "${FORGEJO_COOKIE_JAR_PATH}" "${LOGIN_YAML_PATH}"
   rm -fv "${INIT_YAML_PATH}" "${NEW_OAUTH2_APPLICATION_YAML_PATH}" "${FORGEJO_COOKIE_JAR_PATH}" "${LOGIN_YAML_PATH}"
 }
 
@@ -215,7 +212,7 @@ check_forgejo_initialized_and_running() {
     # https://docs.gitea.com/next/development/api-usage#generating-and-listing-api-tokens
     # curl -H "X-Gitea-OTP: 123456" --url https://yourusername:yourpassword@gitea.your.host/api/v1/users/yourusername/tokens
     get_forgejo_token() {
-      curl -sf -u "${FORGEJO_USERNAME}:${FORGEJO_PASSWORD}" -H "Content-Type: application/json" -d '{"name": "forgejo-install-auth-oidc-directus", "scopes": ["write:admin"]}'  "https://${FORGEJO_FQDN}/api/v1/users/${FORGEJO_USERNAME}/tokens" | tee "${NEW_OAUTH2_APPLICATION_YAML_PATH}.token" | jq -r '.sha1'
+      curl -sf -u "${FORGEJO_USERNAME}:${FORGEJO_PASSWORD}" -H "Content-Type: application/json" -d '{"name": "forgejo-install-auth-oidc-directus", "scopes": ["write:admin"]}'  "https://${FORGEJO_FQDN}/api/v1/users/${FORGEJO_USERNAME}/tokens" | jq -r '.sha1'
     }
     FORGEJO_TOKEN=$(get_forgejo_token)
     while [ "x${FORGEJO_TOKEN}" = "x" ]; do
