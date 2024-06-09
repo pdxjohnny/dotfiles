@@ -98,7 +98,8 @@ export NEW_OAUTH2_APPLICATION_YAML_PATH="${HOME}/.local/forgejo-install/directus
 tee "${NEW_OAUTH2_APPLICATION_YAML_PATH}" <<EOF
 application_name: 'Directus'
 confidential_client: true
-redirect_uri: 'https://${DIRECTUS_FQDN}/auth/login/forgejo/callback'
+redirect_uris:
+- 'https://${DIRECTUS_FQDN}/auth/login/forgejo/callback'
 EOF
 
 touch $HOME/.local/share/systemd/user/forge.service.sh
