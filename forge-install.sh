@@ -45,6 +45,7 @@ WantedBy=default.target
 EOF
 
 mkdir -p "${HOME}/.local/forgejo-install/"
+export INIT_COMPLETE_JSON_PATH="${HOME}/.local/forgejo-install/init-complete.json"
 export INIT_YAML_PATH="${HOME}/.local/forgejo-install/init.yaml"
 tee "${INIT_YAML_PATH}" <<EOF
 db_type: 'sqlite3'
@@ -135,6 +136,7 @@ export INSTALL_WORK_DIR="${HOME}/.local/forgejo-install"
 . "${INSTALL_WORK_DIR}/.venv/bin/activate"
 export FORGEJO_COOKIE_JAR_PATH="${HOME}/.local/forgejo-install/curl-cookie-jar"
 export LOGIN_YAML_PATH="${HOME}/.local/forgejo-install/login.yaml"
+export INIT_COMPLETE_JSON_PATH="${HOME}/.local/forgejo-install/init-complete.json"
 export NEW_OAUTH2_APPLICATION_YAML_PATH="${HOME}/.local/forgejo-install/directus_oauth2_application.yaml"
 export INIT_YAML_PATH="${HOME}/.local/forgejo-install/init.yaml"
 export GITEA_WORK_DIR="${HOME}/.local/forgejo"
@@ -162,10 +164,16 @@ EOF
 
 # TODO TODO TODO TODO REMOVE RM -rfv TODO TODO TODO TODO
 tee -a $HOME/.local/share/systemd/user/forge.service.sh <<'EOF'
-echo IF_YOU_WANT_TO_RESET rm -rfv \
-  "${GITEA_WORK_DIR}" \
-  "${HOME}/.local/directus.sqlite3" \
-  "${HOME}/.local/directus_admin_role_id.txt"
+reset_state() {
+  rm -rfv \
+    "${GITEA_WORK_DIR}" \
+    "${HOME}/.local/directus.sqlite3" \
+    "${HOME}/.local/directus_admin_role_id.txt"
+}
+
+if [ ! -f "${INIT_COMPLETE_JSON_PATH}" ]; then
+  reset_state
+fi
 
 referesh_generated_admin_id() {
   export DIRECTUS_ADMIN_ID=$(echo 'SELECT id FROM directus_users WHERE email="admin@example.com";' \
@@ -242,6 +250,9 @@ check_forgejo_initialized_and_running() {
     jq -rn 'env.RESPONSE | fromjson | .client_id' | python -m keyring set ${USER} ${USER}.directus.auth.forgejo.client_id
     jq -rn 'env.RESPONSE | fromjson | .client_secret' | python -m keyring set ${USER} ${USER}.directus.auth.forgejo.client_secret
     unset RESPONSE
+
+    # TODO Add Application ID, etc. non secrets to init-complete.yaml
+    touch "${INIT_COMPLETE_JSON_PATH}"
   fi
   return 0
 }
