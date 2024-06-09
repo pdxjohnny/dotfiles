@@ -95,8 +95,7 @@ export NEW_OAUTH2_APPLICATION_YAML_PATH="${HOME}/.local/forgejo-install/directus
 tee "${NEW_OAUTH2_APPLICATION_YAML_PATH}" <<EOF
 application_name: 'Directus'
 confidential_client: true
-redirect_uris:
-- 'https://${DIRECTUS_FQDN}/auth/login/forgejo/callback'
+redirect_uri: 'https://${DIRECTUS_FQDN}/auth/login/forgejo/callback'
 EOF
 
 touch $HOME/.local/share/systemd/user/forge.service.sh
@@ -212,7 +211,7 @@ check_forgejo_initialized_and_running() {
     FORGEJO_PASSWORD=$("${PYTHON}" -m keyring get "${USER}" "${USER}.forgejo.password")
 
     get_forgejo_token() {
-      curl -sf -u "${FORGEJO_USERNAME}:${FORGEJO_PASSWORD}" -H "Content-Type: application/json" -d '{"name": "forgejo-install-auth-oidc-directus", "scopes": ["write:admin"]}'  "https://${FORGEJO_FQDN}/api/v1/users/${FORGEJO_USERNAME}/tokens" | jq -r '.sha1'
+      curl -sf -u "${FORGEJO_USERNAME}:${FORGEJO_PASSWORD}" -H "Content-Type: application/json" -d '{"name": "forgejo-install-auth-oidc-directus", "scopes": ["write:admin"]}'  "https://${FORGEJO_FQDN}/api/v1/users/${FORGEJO_USERNAME}/tokens" | tee "${NEW_OAUTH2_APPLICATION_YAML_PATH}.token" | jq -r '.sha1'
     }
     FORGEJO_TOKEN=$(get_forgejo_token)
     while [ "x${FORGEJO_TOKEN}" = "x" ]; do
@@ -224,10 +223,7 @@ check_forgejo_initialized_and_running() {
       cat "${NEW_OAUTH2_APPLICATION_YAML_PATH}" \
         | "${PYTHON}" -c 'import sys, json, yaml; print(json.dumps(yaml.safe_load(sys.stdin)))'
     )
-    # curl -vf -u "${FORGEJO_USERNAME}:${FORGEJO_PASSWORD}" -H "Content-Type: application/json" --data "${data}" "https://${FORGEJO_FQDN}/api/v1/user/applications/oauth2" | tee "${NEW_OAUTH2_APPLICATION_YAML_PATH}.json"
-    curl -vf -H "Authorization: bearer ${FORGEJO_TOKEN}" -H "Content-Type: application/json" --data "${data}" "https://${FORGEJO_FQDN}/api/v1/user/applications/oauth2" | tee "${NEW_OAUTH2_APPLICATION_YAML_PATH}.json.2"
-
-    # curl -sf -H "Authorization: bearer ${FORGEJO_TOKEN}" -H "Content-Type: application/json" -d '{"name": "directus", "confidential_client": true, "redirect_uris": ["https://${DIRECTUS_FQDN}/auth/login/forgejo/callback"]}' "https://${FORGEJO_FQDN}/api/v1/user/applications/oauth2" | tee /dev/stderr | jq -c
+    curl -vf -H "Authorization: token ${FORGEJO_TOKEN}" -H "Content-Type: application/json" --data "${data}" "https://${FORGEJO_FQDN}/api/v1/user/applications/oauth2" | tee "${NEW_OAUTH2_APPLICATION_YAML_PATH}.json"
 
     return 0
 
