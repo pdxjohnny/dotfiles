@@ -162,7 +162,7 @@ EOF
 
 # TODO TODO TODO TODO REMOVE RM -rfv TODO TODO TODO TODO
 tee -a $HOME/.local/share/systemd/user/forge.service.sh <<'EOF'
-rm -rfv \
+echo IF_YOU_WANT_TO_RESET rm -rfv \
   "${GITEA_WORK_DIR}" \
   "${HOME}/.local/directus.sqlite3" \
   "${HOME}/.local/directus_admin_role_id.txt"
