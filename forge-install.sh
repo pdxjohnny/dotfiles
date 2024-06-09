@@ -96,7 +96,7 @@ EOF
 export OAUTH2_APP_CLIENT_VALUES_HTML_PATH="${HOME}/.local/forgejo-install/client-values.html"
 export NEW_OAUTH2_APPLICATION_YAML_PATH="${HOME}/.local/forgejo-install/directus_oauth2_application.yaml"
 tee "${NEW_OAUTH2_APPLICATION_YAML_PATH}" <<EOF
-application_name: 'Directus'
+name: 'Directus'
 confidential_client: true
 redirect_uris:
 - 'https://${DIRECTUS_FQDN}/auth/login/forgejo/callback'
