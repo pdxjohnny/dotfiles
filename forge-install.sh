@@ -93,10 +93,10 @@ EOF
 export OAUTH2_APP_CLIENT_VALUES_HTML_PATH="${HOME}/.local/forgejo-install/client-values.html"
 export NEW_OAUTH2_APPLICATION_YAML_PATH="${HOME}/.local/forgejo-install/directus_oauth2_application.yaml"
 tee "${NEW_OAUTH2_APPLICATION_YAML_PATH}" <<EOF
-_csrf: CSRF_TOKEN
 application_name: 'Directus'
-redirect_uris: https://${DIRECTUS_FQDN}/auth/login/forgejo/callback
-confidential_client: 'on'
+confidential_client: true
+redirect_uris:
+- 'https://${DIRECTUS_FQDN}/auth/login/forgejo/callback'
 EOF
 
 touch $HOME/.local/share/systemd/user/forge.service.sh
@@ -207,19 +207,32 @@ check_forgejo_initialized_and_running() {
 
     # https://docs.gitea.com/next/development/api-usage#generating-and-listing-api-tokens
     # curl -H "X-Gitea-OTP: 123456" --url https://yourusername:yourpassword@gitea.your.host/api/v1/users/yourusername/tokens
-    #
     FORGEJO_USERNAME=$("${PYTHON}" -m keyring get "${USER}" "${USER}.forgejo.username")
     FORGEJO_EMAIL=$("${PYTHON}" -m keyring get "${USER}" "${USER}.forgejo.email")
     FORGEJO_PASSWORD=$("${PYTHON}" -m keyring get "${USER}" "${USER}.forgejo.password")
 
     get_forgejo_token() {
-      curl -sf -u "${FORGEJO_USERNAME}:${FORGEJO_PASSWORD}" -H "Content-Type: application/json" -d '{"name": "forgejo-install-auth-oidc-directus"}'  "https://${FORGEJO_FQDN}/api/v1/users/${FORGEJO_USERNAME}/tokens" | jq -r '.sha1'
+      curl -sf -u "${FORGEJO_USERNAME}:${FORGEJO_PASSWORD}" -H "Content-Type: application/json" -d '{"name": "forgejo-install-auth-oidc-directus", "scopes": ["write:admin"}'  "https://${FORGEJO_FQDN}/api/v1/users/${FORGEJO_USERNAME}/tokens" | jq -r '.sha1'
     }
     FORGEJO_TOKEN=$(get_forgejo_token)
     while [ "x${FORGEJO_TOKEN}" = "x" ]; do
       sleep 0.1
       FORGEJO_TOKEN=$(get_forgejo_token)
     done
+
+    data=$(
+      cat "${NEW_OAUTH2_APPLICATION_YAML_PATH}" \
+        | "${PYTHON}" -c 'import sys, json, yaml; print(json.dumps(yaml.safe_load(sys.stdin)))'
+    )
+    curl -vf -u "${FORGEJO_USERNAME}:${FORGEJO_PASSWORD}" -H "Content-Type: application/json" --data "${data}" "https://${FORGEJO_FQDN}/api/v1/user/applications/oauth2" | tee "${NEW_OAUTH2_APPLICATION_YAML_PATH}.json"
+    curl -vf -H "Authorization: bearer ${FORGEJO_TOKEN}" -H "Content-Type: application/json" --data "${data}" "https://${FORGEJO_FQDN}/api/v1/user/applications/oauth2" | tee "${NEW_OAUTH2_APPLICATION_YAML_PATH}.json.2"
+
+    # curl -sf -H "Authorization: bearer ${FORGEJO_TOKEN}" -H "Content-Type: application/json" -d '{"name": "directus", "confidential_client": true, "redirect_uris": ["https://${DIRECTUS_FQDN}/auth/login/forgejo/callback"]}' "https://${FORGEJO_FQDN}/api/v1/user/applications/oauth2" | tee /dev/stderr | jq -c
+
+    sleep 100
+
+    # return 0
+
 
     query_params=$("${PYTHON}" -c 'import sys, urllib.parse, yaml; print(urllib.parse.urlencode(yaml.safe_load(sys.stdin)))' < "${INIT_YAML_PATH}");
     curl -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}" 1>/dev/null;
