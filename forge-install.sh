@@ -190,7 +190,11 @@ wait_for_and_populate_directus_admin_role_id_txt() {
     sleep 0.01
     referesh_generated_admin_id
   done
-  echo 'DELETE FROM directus_users WHERE email="admin@example.com";' | sqlite3 "${HOME}/.local/directus.sqlite"
+  while [ "x" != "x${DIRECTUS_ADMIN_ID}" ]; do
+    sleep 0.01
+    echo 'DELETE FROM directus_users WHERE email="admin@example.com";' | sqlite3 "${HOME}/.local/directus.sqlite"
+    referesh_generated_admin_id
+  done
   set -x
 }
 
@@ -286,6 +290,9 @@ DIRECTUS_CONTAINER_ID=$(docker run \
   -c \
   'set -x && node cli.js bootstrap && while [ "x$(cat admin_role_id.txt)" = "x" ]; do sleep 10; done && export AUTH_FORGEJO_DEFAULT_ROLE_ID=$(cat admin_role_id.txt) && pm2-runtime start ecosystem.config.cjs')
 new_docker_container_id "${DIRECTUS_CONTAINER_ID}"
+
+docker logs -f "${DIRECTUS_CONTAINER_ID}" &
+new_pid "${DIRECTUS_CONTAINER_ID}"
 
 tail -F /dev/null
 EOF
