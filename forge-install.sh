@@ -191,8 +191,7 @@ wait_for_and_populate_directus_admin_role_id_txt() {
     referesh_generated_admin_id
   done
   while [ "x" != "x${DIRECTUS_ADMIN_ID}" ]; do
-    sleep 0.01
-    echo 'DELETE FROM directus_users WHERE email="admin@example.com";' | sqlite3 "${HOME}/.local/directus.sqlite"
+    echo 'DELETE FROM directus_users WHERE email="admin@example.com";' | sqlite3 "${HOME}/.local/directus.sqlite3"
     referesh_generated_admin_id
   done
   set -x
