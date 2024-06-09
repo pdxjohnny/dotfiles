@@ -224,14 +224,12 @@ check_forgejo_initialized_and_running() {
       cat "${NEW_OAUTH2_APPLICATION_YAML_PATH}" \
         | "${PYTHON}" -c 'import sys, json, yaml; print(json.dumps(yaml.safe_load(sys.stdin)))'
     )
-    curl -vf -u "${FORGEJO_USERNAME}:${FORGEJO_PASSWORD}" -H "Content-Type: application/json" --data "${data}" "https://${FORGEJO_FQDN}/api/v1/user/applications/oauth2" | tee "${NEW_OAUTH2_APPLICATION_YAML_PATH}.json"
+    # curl -vf -u "${FORGEJO_USERNAME}:${FORGEJO_PASSWORD}" -H "Content-Type: application/json" --data "${data}" "https://${FORGEJO_FQDN}/api/v1/user/applications/oauth2" | tee "${NEW_OAUTH2_APPLICATION_YAML_PATH}.json"
     curl -vf -H "Authorization: bearer ${FORGEJO_TOKEN}" -H "Content-Type: application/json" --data "${data}" "https://${FORGEJO_FQDN}/api/v1/user/applications/oauth2" | tee "${NEW_OAUTH2_APPLICATION_YAML_PATH}.json.2"
 
     # curl -sf -H "Authorization: bearer ${FORGEJO_TOKEN}" -H "Content-Type: application/json" -d '{"name": "directus", "confidential_client": true, "redirect_uris": ["https://${DIRECTUS_FQDN}/auth/login/forgejo/callback"]}' "https://${FORGEJO_FQDN}/api/v1/user/applications/oauth2" | tee /dev/stderr | jq -c
 
-    sleep 100
-
-    # return 0
+    return 0
 
 
     query_params=$("${PYTHON}" -c 'import sys, urllib.parse, yaml; print(urllib.parse.urlencode(yaml.safe_load(sys.stdin)))' < "${INIT_YAML_PATH}");
@@ -244,7 +242,7 @@ check_forgejo_initialized_and_running() {
     CSRF_TOKEN=$(get_login_crsf_token);
     while [ "x${CSRF_TOKEN}" == "x" ]; do
       CSRF_TOKEN=$(get_login_crsf_token);
-      sleep 10;
+      sleep 0.1;
     done
     query_params=$(
       sed -e "s/CSRF_TOKEN/\"${CSRF_TOKEN}\"/g" "${LOGIN_YAML_PATH}" \
@@ -268,7 +266,6 @@ check_forgejo_initialized_and_running() {
       sed -e "s/CSRF_TOKEN/\"${CSRF_TOKEN}\"/g" "${NEW_OAUTH2_APPLICATION_YAML_PATH}" \
         | "${PYTHON}" -c 'import sys, urllib.parse, yaml; print(urllib.parse.urlencode(yaml.safe_load(sys.stdin)))'
     )
-    sleep 10
     curl -f -b "${FORGEJO_COOKIE_JAR_PATH}" -v "https://${FORGEJO_FQDN}/admin/applications" 2>&1 | tee "${OAUTH2_APP_CLIENT_VALUES_HTML_PATH}.list.html"
     curl -f -b "${FORGEJO_COOKIE_JAR_PATH}" -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}/admin/applications/oauth2" 2>&1 | tee "${OAUTH2_APP_CLIENT_VALUES_HTML_PATH}"
 
