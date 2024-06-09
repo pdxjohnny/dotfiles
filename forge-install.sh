@@ -6,11 +6,12 @@ export INSTALL_WORK_DIR="${HOME}/.local/forgejo-install"
 export GITEA_WORK_DIR="${HOME}/.local/forgejo"
 export PYTHON="${PYTHON:-${DEFAULT_PYTHON}}"
 
-"${PYTHON}" -m venv "${INSTALL_WORK_DIR}/.venv"
+if [ ! -f "${INSTALL_WORK_DIR}/.venv/bin/activate" ]; then
+  "${PYTHON}" -m venv "${INSTALL_WORK_DIR}/.venv"
+  . "${INSTALL_WORK_DIR}/.venv/bin/activate"
+  python -m pip install pyyaml keyring beautifulsoup4
+fi
 . "${INSTALL_WORK_DIR}/.venv/bin/activate"
-python -m pip install pyyaml keyring beautifulsoup4
-
-set +e
 
 FORGEJO_USERNAME=$(python -m keyring get "${USER}" "${USER}.forgejo.username")
 if [ "x${FORGEJO_USERNAME}" = "x" ]; then
