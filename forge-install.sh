@@ -215,9 +215,6 @@ check_forgejo_initialized_and_running() {
     # https://docs.gitea.com/next/development/api-usage#generating-and-listing-api-tokens
     # curl -H "X-Gitea-OTP: 123456" --url https://yourusername:yourpassword@gitea.your.host/api/v1/users/yourusername/tokens
     get_forgejo_token() {
-      nonlocal FORGEJO_USERNAME
-      nonlocal FORGEJO_PASSWORD
-
       curl -sf -u "${FORGEJO_USERNAME}:${FORGEJO_PASSWORD}" -H "Content-Type: application/json" -d '{"name": "forgejo-install-auth-oidc-directus", "scopes": ["write:admin"]}'  "https://${FORGEJO_FQDN}/api/v1/users/${FORGEJO_USERNAME}/tokens" | tee "${NEW_OAUTH2_APPLICATION_YAML_PATH}.token" | jq -r '.sha1'
     }
     FORGEJO_TOKEN=$(get_forgejo_token)
@@ -230,55 +227,10 @@ check_forgejo_initialized_and_running() {
       cat "${NEW_OAUTH2_APPLICATION_YAML_PATH}" \
         | python -c 'import sys, json, yaml; print(json.dumps(yaml.safe_load(sys.stdin)))'
     )
-    curl -vf -u "${FORGEJO_USERNAME}:${FORGEJO_PASSWORD}" -H "Content-Type: application/json" --data "${data}" "https://${FORGEJO_FQDN}/api/v1/user/applications/oauth2" | tee "${NEW_OAUTH2_APPLICATION_YAML_PATH}.json"
-
-    return 0
-
-
-    query_params=$(python -c 'import sys, urllib.parse, yaml; print(urllib.parse.urlencode(yaml.safe_load(sys.stdin)))' < "${INIT_YAML_PATH}");
-    curl -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}" 1>/dev/null;
-
-    get_login_crsf_token() {
-      curl -H "Authorization: Bearer ${FORGEJO_TOKEN}" "https://${FORGEJO_FQDN}/user/login" | grep csrfToken | awk '{print $NF}' | sed -e "s/'//g" -e 's/,//g'
-    }
-
-    CSRF_TOKEN=$(get_login_crsf_token);
-    while [ "x${CSRF_TOKEN}" == "x" ]; do
-      CSRF_TOKEN=$(get_login_crsf_token);
-      sleep 0.1;
-    done
-    query_params=$(
-      sed -e "s/CSRF_TOKEN/\"${CSRF_TOKEN}\"/g" "${LOGIN_YAML_PATH}" \
-        | python -c 'import sys, urllib.parse, yaml; print(urllib.parse.urlencode(yaml.safe_load(sys.stdin)))'
-    )
-    curl -b "${FORGEJO_COOKIE_JAR_PATH}" --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}/user/login" > /dev/null
-    curl -b "${FORGEJO_COOKIE_JAR_PATH}" -v "https://${FORGEJO_FQDN}/" > /dev/null
-
-    get_oauth_app_crsf_token() {
-      curl -b "${FORGEJO_COOKIE_JAR_PATH}" --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" "https://${FORGEJO_FQDN}/admin/applications" 1>&2
-      curl -b "${FORGEJO_COOKIE_JAR_PATH}" --cookie-jar "${FORGEJO_COOKIE_JAR_PATH}" "https://${FORGEJO_FQDN}/admin/applications" | grep csrfToken | awk '{print $NF}' | sed -e "s/'//g" -e 's/,//g'
-    }
-
-    echo "creating-forgejo-application-directus";
-    # CSRF_TOKEN=$(get_oauth_app_crsf_token);
-    # while [ "x${CSRF_TOKEN}" == "x" ]; do
-    #   CSRF_TOKEN=$(get_oauth_app_crsf_token);
-    #   sleep 10;
-    # done
-    query_params=$(
-      sed -e "s/CSRF_TOKEN/\"${CSRF_TOKEN}\"/g" "${NEW_OAUTH2_APPLICATION_YAML_PATH}" \
-        | python -c 'import sys, urllib.parse, yaml; print(urllib.parse.urlencode(yaml.safe_load(sys.stdin)))'
-    )
-    curl -f -b "${FORGEJO_COOKIE_JAR_PATH}" -v "https://${FORGEJO_FQDN}/admin/applications" 2>&1 | tee "${OAUTH2_APP_CLIENT_VALUES_HTML_PATH}.list.html"
-    curl -f -b "${FORGEJO_COOKIE_JAR_PATH}" -v -X POST --data-raw "${query_params}" "https://${FORGEJO_FQDN}/admin/applications/oauth2" 2>&1 | tee "${OAUTH2_APP_CLIENT_VALUES_HTML_PATH}"
-
-    echo TODO beautifulsoup
-    head -n 99999 "${OAUTH2_APP_CLIENT_VALUES_HTML_PATH}"
-
-    echo TODO https://docs.gitea.com/api/1.22/#tag/admin/operation/adminGetRunnerRegistrationToken as another systemd file
-
-    echo "forgejo-application-directus-oidc-init-complete";
-    return 0
+    export RESPONSE=$(curl -vf -u "${FORGEJO_USERNAME}:${FORGEJO_PASSWORD}" -H "Content-Type: application/json" --data "${data}" "https://${FORGEJO_FQDN}/api/v1/user/applications/oauth2" | jq -c)
+    jq -rn 'env.RESPONSE | fromjson | .client_id' | python -m keyring set ${USER} ${USER}.directus.auth.forgejo.client_id
+    jq -rn 'env.RESPONSE | fromjson | .client_secret' | python -m keyring set ${USER} ${USER}.directus.auth.forgejo.client_secret
+    unset RESPONSE
   fi
   return 0
 }
@@ -308,8 +260,8 @@ DIRECTUS_CONTAINER_ID=$(docker run \
   -e AUTH_DISABLE_DEFAULT=true \
   -e AUTH_PROVIDERS="forgejo" \
   -e AUTH_FORGEJO_DRIVER="openid" \
-  -e AUTH_FORGEJO_CLIENT_ID="$(python -m keyring get directus auth.forgejo.client_id)" \
-  -e AUTH_FORGEJO_CLIENT_SECRET="$(python -m keyring get directus auth.forgejo.client_secret)" \
+  -e AUTH_FORGEJO_CLIENT_ID="$(python -m keyring get ${USER} ${USER}.directus.auth.forgejo.client_id)" \
+  -e AUTH_FORGEJO_CLIENT_SECRET="$(python -m keyring get ${USER} ${USER}.directus.auth.forgejo.client_secret)" \
   -e AUTH_FORGEJO_ISSUER_URL="https://${FORGEJO_FQDN}/.well-known/openid-configuration" \
   -e AUTH_FORGEJO_IDENTIFIER_KEY="email" \
   -e AUTH_FORGEJO_REDIRECT_ALLOW_LIST="https://${DIRECTUS_FQDN}/auth/login/forgejo/callback" \
