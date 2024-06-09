@@ -167,6 +167,11 @@ rm -rfv \
   "${HOME}/.local/directus.sqlite3" \
   "${HOME}/.local/directus_admin_role_id.txt"
 
+referesh_generated_admin_id() {
+  export DIRECTUS_ADMIN_ID=$(echo 'SELECT id FROM directus_users WHERE email="admin@example.com";' \
+                             | sqlite3 ${HOME}/.local/directus.sqlite3 2> >(grep -v 'database is locked' | grep -v directus_users >&2))
+}
+
 referesh_role_id() {
   export DIRECTUS_ADMIN_ROLE_ID=$(echo 'SELECT id from directus_roles;' \
                                   | sqlite3 ${HOME}/.local/directus.sqlite3 2> >(grep -v 'database is locked' | grep -v directus_roles >&2) \
@@ -180,6 +185,12 @@ wait_for_and_populate_directus_admin_role_id_txt() {
     sleep 0.01
     referesh_role_id
   done
+  referesh_generated_admin_id
+  while [ "x" = "x${DIRECTUS_ADMIN_ID}" ]; do
+    sleep 0.01
+    referesh_generated_admin_id
+  done
+  echo 'DELETE FROM directus_users WHERE email="admin@example.com";' | sqlite3 "${HOME}/.local/directus.sqlite"
   set -x
 }
 
@@ -254,6 +265,10 @@ DIRECTUS_CONTAINER_ID=$(docker run \
   --detach \
   -p 8055:8055 \
   -e PUBLIC_URL="https://${DIRECTUS_FQDN}" \
+  -e TELEMETRY=false \
+  -e WEBSOCKETS_ENABLED=true \
+  -e WEBSOCKETS_REST_AUTH=strict \
+  -e WEBSOCKETS_GRAPHQL_AUTH=strict \
   -e AUTH_DISABLE_DEFAULT=true \
   -e AUTH_PROVIDERS="forgejo" \
   -e AUTH_FORGEJO_DRIVER="openid" \
