@@ -28,6 +28,10 @@ if [ "x${FORGEJO_PASSWORD}" = "x" ]; then
   python -m keyring set "${USER}" "${USER}.forgejo.password"
 fi
 
+export SSH_USER="alice"
+export SSH_HOST="scitt.unstable.chadig.com"
+export SSH_USER_AT_HOST="${SSH_USER}@${SSH_HOST}"
+export SSH_WORK_DIR="/home/${SSH_USER}"
 export FORGEJO_FQDN="git.pdxjohnny.chadig.com"
 export DIRECTUS_FQDN="directus.pdxjohnny.chadig.com"
 
@@ -109,6 +113,20 @@ tee $HOME/.local/share/systemd/user/forge.service.sh <<'EOF'
 #!/usr/bin/env bash
 set -xeuo pipefail
 
+declare -a TEMPDIRS=()
+
+new_tempdir() {
+  tempdir=$(mktemp -d)
+  TEMPDIRS[${#TEMPDIRS[@]}]="${tempdir}"
+  echo "${tempdir}"
+}
+
+cleanup_tempdirs() {
+  for tempdir in "${TEMPDIRS[@]}"; do
+    rm -rf "${tempdir}"
+  done
+}
+
 declare -a PIDS=()
 
 new_pid() {
@@ -150,6 +168,7 @@ cleanup_files() {
 cleanup() {
   set +e
   cleanup_files
+  cleanup_tempdirs
   cleanup_pids
   cleanup_docker_container_ids
 }
@@ -159,6 +178,8 @@ trap cleanup EXIT
 EOF
 tee -a $HOME/.local/share/systemd/user/forge.service.sh <<EOF
 export DEFAULT_PYTHON="${DEFAULT_PYTHON}"
+export SSH_USER_AT_HOST="${SSH_USER_AT_HOST}"
+export SSH_WORK_DIR="${SSH_WORK_DIR}"
 export FORGEJO_FQDN="${FORGEJO_FQDN}"
 export DIRECTUS_FQDN="${DIRECTUS_FQDN}"
 EOF
@@ -206,16 +227,51 @@ wait_for_and_populate_directus_admin_role_id_txt() {
   set -x
 }
 
-forgejo web &
+find_listening_ports() {
+  # Check if PID is provided
+  if [ -z "$1" ]; then
+    echo "Usage: find_listening_ports <PID>" 1>&2
+    return 1
+  fi
+
+  PID=$1
+
+  # Check if the process with the given PID exists
+  if ! ps -p $PID > /dev/null 2>&1; then
+    echo "Process with PID $PID does not exist." 1>&2
+    return 1
+  fi
+
+  # Find listening TCP ports for the given PID using ss
+  LISTENING_PORTS=$(ss -ltnp 2>/dev/null | grep "pid=$PID")
+
+  if [ -z "$LISTENING_PORTS" ]; then
+    echo "Process with PID $PID not listening on any ports." 1>&2
+    return 1
+  fi
+
+  echo "$LISTENING_PORTS" | awk '{print $4}' | awk -F':' '{print $NF}'
+}
+
+forgejo web --port 0 &
 FORGEJO_PID=$!
 new_pid "${FORGEJO_PID}"
+set +x
+until find_listening_ports "${FORGEJO_PID}"; do sleep 0.01; done
+set -x
+FORGEJO_PORT=$(find_listening_ports "${FORGEJO_PID}")
 
-ssh -nNT -R 127.0.0.1:3000:0.0.0.0:3000 alice@scitt.unstable.chadig.com &
+CADDY_ADMIN_SOCK_DIR_PATH=$(new_tempdir)
+ssh -nNT -R "${SSH_WORK_DIR}/caddy.admin.sock:${CADDY_ADMIN_SOCK_DIR_PATH}/caddy.admin.sock" "${SSH_USER_AT_HOST}" &
+CADDY_ADMIN_SOCK_SSH_TUNNEL_PID=$!
+new_pid "${CADDY_ADMIN_SOCK_SSH_TUNNEL_PID}"
+
+ssh -nNT -R "${SSH_WORK_DIR}/${FORGEJO_FQDN}.sock:127.0.0.1:${FORGEJO_PORT}" "${SSH_USER_AT_HOST}" &
 FORGEJO_SSH_TUNNEL_PID=$!
 new_pid "${FORGEJO_SSH_TUNNEL_PID}"
-ssh -nNT -R 127.0.0.1:8055:0.0.0.0:8055 alice@scitt.unstable.chadig.com &
-DIRECTUS_SSH_TUNNEL_PID=$!
-new_pid "${DIRECTUS_SSH_TUNNEL_PID}"
+
+curl --unix-socket ${CADDY_ADMIN_SOCK_DIR_PATH}/caddy.admin.sock"
+
 
 echo "awaiting-forgejo";
 
@@ -278,7 +334,6 @@ wait_for_and_populate_directus_admin_role_id_txt &
 
 DIRECTUS_CONTAINER_ID=$(docker run \
   --detach \
-  -p 8055:8055 \
   -e PUBLIC_URL="https://${DIRECTUS_FQDN}" \
   -e TELEMETRY=false \
   -e WEBSOCKETS_ENABLED=true \
@@ -299,11 +354,20 @@ DIRECTUS_CONTAINER_ID=$(docker run \
   -v "${HOME}/.local/directus.sqlite3:/directus/database/database.sqlite:z" \
   directus/directus \
   -c \
-  'set -x && node cli.js bootstrap && while [ "x$(cat admin_role_id.txt)" = "x" ]; do sleep 10; done && export AUTH_FORGEJO_DEFAULT_ROLE_ID=$(cat admin_role_id.txt) && pm2-runtime start ecosystem.config.cjs')
+  'set -x && node cli.js bootstrap && while [ "x$(cat admin_role_id.txt)" = "x" ]; do sleep 0.01; done && export AUTH_FORGEJO_DEFAULT_ROLE_ID=$(cat admin_role_id.txt) && pm2-runtime start ecosystem.config.cjs')
 new_docker_container_id "${DIRECTUS_CONTAINER_ID}"
 
 docker logs -f "${DIRECTUS_CONTAINER_ID}" &
-new_pid "${DIRECTUS_CONTAINER_ID}"
+DIRECTUS_CONTAINER_LOGS_PID=$!
+new_pid "${DIRECTUS_CONTAINER_LOGS_PID}"
+
+DIRECTUS_CONTAINER_IP=$(docker inspect --format json "${DIRECTUS_CONTAINER_ID}" | jq -r '.[0].NetworkSettings.IPAddress')
+ssh -nNT -R "${SSH_WORK_DIR}/${DIRECTUS_FQDN}.sock:${DIRECTUS_CONTAINER_IP}:8055" "${SSH_USER_AT_HOST}" &
+DIRECTUS_SSH_TUNNEL_PID=$!
+
+new_pid "${DIRECTUS_SSH_TUNNEL_PID}"
+
+kill "${CADDY_ADMIN_SOCK_SSH_TUNNEL_PID}"
 
 tail -F /dev/null
 EOF
