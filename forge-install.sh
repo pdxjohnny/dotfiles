@@ -252,6 +252,66 @@ find_listening_ports() {
 
   echo "$LISTENING_PORTS" | awk '{print $4}' | awk -F':' '{print $NF}'
 }
+#!/bin/bash
+
+# Function to retrieve route ID by FQDN
+get_route_id() {
+    local socket_path=$1
+    local fqdn=$2
+
+    local route_id=$(curl -s --unix-socket $socket_path http://localhost/config/apps/http/servers/srv0/routes | jq -r --arg fqdn "$fqdn" '.routes[] | select(.match[0].host[0] == $fqdn) | .id')
+    echo "$route_id"
+}
+
+# Function to create or update a route in Caddy
+create_or_update_route() {
+    local socket_path=$1
+    local fqdn=$2
+    local unix_socket=$3
+
+    local route_id=$(get_route_id $socket_path $fqdn)
+
+    if [ -n "$route_id" ]; then
+        # Route exists, update it
+        echo "Updating route $route_id for $fqdn"
+        curl -X PATCH --unix-socket $socket_path "http://localhost/config/apps/http/servers/srv0/routes/$route_id" \
+             -H "Content-Type: application/json" \
+             -d '{
+                  "handle": [
+                      {
+                          "handler": "reverse_proxy",
+                          "upstreams": [
+                              {
+                                  "dial": "'"$unix_socket"'"
+                              }
+                          ]
+                      }
+                  ]
+              }'
+    else
+        # Route doesn't exist, create it
+        echo "Creating route for $fqdn"
+        curl -X POST --unix-socket $socket_path "http://localhost/config/apps/http/servers/srv0/routes" \
+             -H "Content-Type: application/json" \
+             -d '{
+                  "match": [
+                      {
+                          "host": ["'"$fqdn"'"]
+                      }
+                  ],
+                  "handle": [
+                      {
+                          "handler": "reverse_proxy",
+                          "upstreams": [
+                              {
+                                  "dial": "'"$unix_socket"'"
+                              }
+                          ]
+                      }
+                  ]
+              }'
+    fi
+}
 
 forgejo web --port 0 &
 FORGEJO_PID=$!
@@ -270,8 +330,7 @@ ssh -nNT -R "${SSH_WORK_DIR}/${FORGEJO_FQDN}.sock:127.0.0.1:${FORGEJO_PORT}" "${
 FORGEJO_SSH_TUNNEL_PID=$!
 new_pid "${FORGEJO_SSH_TUNNEL_PID}"
 
-curl --unix-socket ${CADDY_ADMIN_SOCK_DIR_PATH}/caddy.admin.sock"
-
+create_or_update_route "${CADDY_ADMIN_SOCK_DIR_PATH}/caddy.admin.sock" "${FORGEJO_FQDN}" "${SSH_WORK_DIR}/${FORGEJO_FQDN}.sock"
 
 echo "awaiting-forgejo";
 
@@ -364,8 +423,9 @@ new_pid "${DIRECTUS_CONTAINER_LOGS_PID}"
 DIRECTUS_CONTAINER_IP=$(docker inspect --format json "${DIRECTUS_CONTAINER_ID}" | jq -r '.[0].NetworkSettings.IPAddress')
 ssh -nNT -R "${SSH_WORK_DIR}/${DIRECTUS_FQDN}.sock:${DIRECTUS_CONTAINER_IP}:8055" "${SSH_USER_AT_HOST}" &
 DIRECTUS_SSH_TUNNEL_PID=$!
-
 new_pid "${DIRECTUS_SSH_TUNNEL_PID}"
+
+create_or_update_route "${CADDY_ADMIN_SOCK_DIR_PATH}/caddy.admin.sock" "${DIRECTUS_FQDN}" "${SSH_WORK_DIR}/${DIRECTUS_FQDN}.sock"
 
 kill "${CADDY_ADMIN_SOCK_SSH_TUNNEL_PID}"
 
