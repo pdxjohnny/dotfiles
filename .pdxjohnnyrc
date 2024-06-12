@@ -307,9 +307,14 @@ if [ -f "${HOME}/.cargo/env" ]; then
   source "${HOME}/.cargo/env"
 fi
 
-export NO_PROXY="$(OIFS="$IFS"; IFS=$'\n'; array=($(ip a | grep inet\ | awk '{print $2}' | sed -e 's/\/.*//g' | sort | uniq)); IFS="$OIFS"; array+=(${NO_PROXY}); (export IFS=','; echo "${array[*]}"))"
-export no_proxy="$(OIFS="$IFS"; IFS=$'\n'; array=($(ip a | grep inet\ | awk '{print $2}' | sed -e 's/\/.*//g' | sort | uniq)); IFS="$OIFS"; array+=(${no_proxy}); (export IFS=','; echo "${array[*]}"))"
+export NO_PROXY="$(OIFS="$IFS"; IFS=$'\n'; array=($(ip a | grep inet\ | awk '{print $2}' | sed -e 's/\/.*//g' | grep -v ::1 | sort | uniq)); IFS="$OIFS"; array+=(${NO_PROXY}); (export IFS=','; echo "${array[*]}"))"
+export no_proxy="$(OIFS="$IFS"; IFS=$'\n'; array=($(ip a | grep inet\ | awk '{print $2}' | sed -e 's/\/.*//g' | grep -v ::1 |sort | uniq)); IFS="$OIFS"; array+=(${no_proxy}); (export IFS=','; echo "${array[*]}"))"
 
+pip_latest() {   latest=$(pip install $1== 2>&1 | grep ERROR:\ Could\ not | awk '{print $NF}' | sed -e 's/)//');   echo "$1==$latest"; }
+
+fork() {
+   yes | gh repo fork --remote; gh repo set-default $(git remote get-url upstream | sed -e 's/https:\/\/github.com\///g')
+}
 
 function git_grep_and_edit {
   local FILE=$(git grep -n "$@" | sed -e 's/:.*//g' | head -n ${RESULT_NUM:-1} | tail -n 1);
