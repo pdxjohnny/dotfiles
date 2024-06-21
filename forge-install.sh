@@ -264,7 +264,7 @@ get_route_id() {
     local socket_path=$1
     local fqdn=$2
 
-    local route_id=$(curl -s --unix-socket $socket_path http://localhost/config/apps/http/servers/srv0/routes | jq -r --arg fqdn "$fqdn" '.routes[] | select(.match[0].host[0] == $fqdn) | .id')
+    local route_id=$(curl -fs --unix-socket $socket_path http://localhost/config/ | jq -r --arg fqdn "$fqdn" '.apps.http.servers.srv0.routes[] | select(.match[0].host[0] == $fqdn) | .id')
     echo "$route_id"
 }
 
@@ -274,48 +274,17 @@ create_or_update_route() {
     local fqdn=$2
     local unix_socket=$3
 
-    local route_id=$(get_route_id $socket_path $fqdn)
-
-    if [ -n "$route_id" ]; then
-        # Route exists, update it
-        echo "Updating route $route_id for $fqdn"
-        curl -X PATCH --unix-socket $socket_path "http://localhost/config/apps/http/servers/srv0/routes/$route_id" \
-             -H "Content-Type: application/json" \
-             -d '{
-                  "handle": [
-                      {
-                          "handler": "reverse_proxy",
-                          "upstreams": [
-                              {
-                                  "dial": "'"$unix_socket"'"
-                              }
-                          ]
-                      }
-                  ]
-              }'
-    else
-        # Route doesn't exist, create it
-        echo "Creating route for $fqdn"
-        curl -X POST --unix-socket $socket_path "http://localhost/config/apps/http/servers/srv0/routes" \
-             -H "Content-Type: application/json" \
-             -d '{
-                  "match": [
-                      {
-                          "host": ["'"$fqdn"'"]
-                      }
-                  ],
-                  "handle": [
-                      {
-                          "handler": "reverse_proxy",
-                          "upstreams": [
-                              {
-                                  "dial": "'"$unix_socket"'"
-                              }
-                          ]
-                      }
-                  ]
-              }'
-    fi
+    export config=$(curl -f --unix-socket $socket_path "http://localhost/config/")
+    echo -e "$fqdn {\n    reverse_proxy $unix_socket\n}\n" \
+    | curl --unix-socket $socket_path http://localhost/adapt \
+         -H "Content-Type: text/caddyfile" \
+        --data-binary @- \
+    | tee /tmp/1 \
+    | jq '.result * (env.config | fromjson)' \
+    | tee /tmp/2 \
+    | curl -f -X POST --unix-socket $socket_path "http://localhost/config/" \
+         -H "Content-Type: application/json" \
+         -d @-
 }
 
 forgejo web --port 0 &
@@ -327,10 +296,11 @@ set -x
 FORGEJO_PORT=$(find_listening_ports "${FORGEJO_PID}")
 
 CADDY_ADMIN_SOCK_DIR_PATH=$(new_tempdir)
-ssh -o StrictHostKeyChecking=no -nNT -R "${SSH_WORK_DIR}/caddy.admin.sock:${CADDY_ADMIN_SOCK_DIR_PATH}/caddy.admin.sock" "${SSH_USER_AT_HOST}" &
+ssh -o StrictHostKeyChecking=no -nNT -L "${CADDY_ADMIN_SOCK_DIR_PATH}/caddy.admin.sock:${SSH_WORK_DIR}/caddy.admin.sock" "${SSH_USER_AT_HOST}" &
 CADDY_ADMIN_SOCK_SSH_TUNNEL_PID=$!
 new_pid "${CADDY_ADMIN_SOCK_SSH_TUNNEL_PID}"
 
+ssh -o StrictHostKeyChecking=no -nT "${SSH_USER_AT_HOST}" rm -fv "${SSH_WORK_DIR}/${FORGEJO_FQDN}.sock"
 ssh -o StrictHostKeyChecking=no -nNT -R "${SSH_WORK_DIR}/${FORGEJO_FQDN}.sock:127.0.0.1:${FORGEJO_PORT}" "${SSH_USER_AT_HOST}" &
 FORGEJO_SSH_TUNNEL_PID=$!
 new_pid "${FORGEJO_SSH_TUNNEL_PID}"
@@ -426,6 +396,7 @@ DIRECTUS_CONTAINER_LOGS_PID=$!
 new_pid "${DIRECTUS_CONTAINER_LOGS_PID}"
 
 DIRECTUS_CONTAINER_IP=$(docker inspect --format json "${DIRECTUS_CONTAINER_ID}" | jq -r '.[0].NetworkSettings.IPAddress')
+ssh -o StrictHostKeyChecking=no -nT "${SSH_USER_AT_HOST}" rm -fv "${SSH_WORK_DIR}/${DIRECTUS_FQDN}.sock"
 ssh -o StrictHostKeyChecking=no -nNT -R "${SSH_WORK_DIR}/${DIRECTUS_FQDN}.sock:${DIRECTUS_CONTAINER_IP}:8055" "${SSH_USER_AT_HOST}" &
 DIRECTUS_SSH_TUNNEL_PID=$!
 new_pid "${DIRECTUS_SSH_TUNNEL_PID}"
