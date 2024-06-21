@@ -1,51 +1,5 @@
 {
-  admin "unix//home/alice/caddy.admin.sock"
-}
-
-alice.chadig.com {
-  redir "https://github.com/intel/dffml/discussions/1406?sort=new" temporary
-}
-
-github-webhook-notary.scitt.alice.chadig.com {
-  reverse_proxy http://localhost:7777
-}
-
-scitt.bob.chadig.com {
-  reverse_proxy http://localhost:6000
-}
-
-scitt.alice.chadig.com {
-  reverse_proxy http://localhost:7000
-}
-
-view.scitt.unstable.chadig.com {
-  reverse_proxy http://localhost:8001
-}
-
-scitt.unstable.chadig.com {
-  reverse_proxy http://localhost:8000
-}
-
-scitt.pdxjohnny.chadig.com {
-  reverse_proxy http://localhost:9000
-}
-
-git.pdxjohnny.chadig.com {
-  reverse_proxy http://localhost:3000
-}
-
-forgejo.pdxjohnny.chadig.com {
-  reverse_proxy http://localhost:3000
-}
-
-directus.pdxjohnny.chadig.com {
-  reverse_proxy http://localhost:8055
-}
-
-keycloak.pdxjohnny.chadig.com {
-  reverse_proxy http://localhost:7001
-}
-
-define.chadig.com {
-  respond "Cha-Dig: can you dig it? chaaaaaaa I can dig it!!!"
+  admin "unix//home/alice/caddy.admin.sock" {
+    origins localhost
+  }
 }

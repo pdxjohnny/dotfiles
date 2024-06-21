@@ -29,11 +29,16 @@ if [ "x${FORGEJO_PASSWORD}" = "x" ]; then
 fi
 
 export SSH_USER="alice"
-export SSH_HOST="scitt.unstable.chadig.com"
+# TODO If local...
+export ROOT_IN_TCB_FQDN="localhost"
+export ROOT_OUT_TCB_FQDN="localhost"
+# export ROOT_IN_TCB_FQDN="${ROOT_IN_TCB_FQDN}"
+# export ROOT_OUT_TCB_FQDN="nahdig.com"
+export SSH_HOST="scitt.unstable.${ROOT_IN_TCB_FQDN}"
 export SSH_USER_AT_HOST="${SSH_USER}@${SSH_HOST}"
 export SSH_WORK_DIR="/home/${SSH_USER}"
-export FORGEJO_FQDN="git.pdxjohnny.chadig.com"
-export DIRECTUS_FQDN="directus.pdxjohnny.chadig.com"
+export FORGEJO_FQDN="git.pdxjohnny.${ROOT_IN_TCB_FQDN}"
+export DIRECTUS_FQDN="directus.pdxjohnny.${ROOT_IN_TCB_FQDN}"
 
 mkdir -p $HOME/.local/share/systemd/user
 
@@ -322,11 +327,11 @@ set -x
 FORGEJO_PORT=$(find_listening_ports "${FORGEJO_PID}")
 
 CADDY_ADMIN_SOCK_DIR_PATH=$(new_tempdir)
-ssh -nNT -R "${SSH_WORK_DIR}/caddy.admin.sock:${CADDY_ADMIN_SOCK_DIR_PATH}/caddy.admin.sock" "${SSH_USER_AT_HOST}" &
+ssh -o StrictHostKeyChecking=no -nNT -R "${SSH_WORK_DIR}/caddy.admin.sock:${CADDY_ADMIN_SOCK_DIR_PATH}/caddy.admin.sock" "${SSH_USER_AT_HOST}" &
 CADDY_ADMIN_SOCK_SSH_TUNNEL_PID=$!
 new_pid "${CADDY_ADMIN_SOCK_SSH_TUNNEL_PID}"
 
-ssh -nNT -R "${SSH_WORK_DIR}/${FORGEJO_FQDN}.sock:127.0.0.1:${FORGEJO_PORT}" "${SSH_USER_AT_HOST}" &
+ssh -o StrictHostKeyChecking=no -nNT -R "${SSH_WORK_DIR}/${FORGEJO_FQDN}.sock:127.0.0.1:${FORGEJO_PORT}" "${SSH_USER_AT_HOST}" &
 FORGEJO_SSH_TUNNEL_PID=$!
 new_pid "${FORGEJO_SSH_TUNNEL_PID}"
 
@@ -421,7 +426,7 @@ DIRECTUS_CONTAINER_LOGS_PID=$!
 new_pid "${DIRECTUS_CONTAINER_LOGS_PID}"
 
 DIRECTUS_CONTAINER_IP=$(docker inspect --format json "${DIRECTUS_CONTAINER_ID}" | jq -r '.[0].NetworkSettings.IPAddress')
-ssh -nNT -R "${SSH_WORK_DIR}/${DIRECTUS_FQDN}.sock:${DIRECTUS_CONTAINER_IP}:8055" "${SSH_USER_AT_HOST}" &
+ssh -o StrictHostKeyChecking=no -nNT -R "${SSH_WORK_DIR}/${DIRECTUS_FQDN}.sock:${DIRECTUS_CONTAINER_IP}:8055" "${SSH_USER_AT_HOST}" &
 DIRECTUS_SSH_TUNNEL_PID=$!
 new_pid "${DIRECTUS_SSH_TUNNEL_PID}"
 
