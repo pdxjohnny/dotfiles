@@ -40,6 +40,10 @@ export SSH_WORK_DIR="/home/${SSH_USER}"
 export FORGEJO_FQDN="git.pdxjohnny.${ROOT_IN_TCB_FQDN}"
 export DIRECTUS_FQDN="directus.pdxjohnny.${ROOT_IN_TCB_FQDN}"
 
+if [[ "x${ROOT_IN_TCB_FQDN}" = "localhost" ]] && [[ "x${ROOT_OUT_TCB_FQDN}" = "localhost" ]]; then
+  export CURL_CA_BUNDLE="${HOME}/.local/share/caddy/pki/authorities/local/root.crt"
+fi
+
 mkdir -p $HOME/.local/share/systemd/user
 
 tee $HOME/.local/share/systemd/user/forge.service <<'EOF'
@@ -187,10 +191,16 @@ export SSH_USER_AT_HOST="${SSH_USER_AT_HOST}"
 export SSH_WORK_DIR="${SSH_WORK_DIR}"
 export FORGEJO_FQDN="${FORGEJO_FQDN}"
 export DIRECTUS_FQDN="${DIRECTUS_FQDN}"
+export ROOT_IN_TCB_FQDN="${ROOT_IN_TCB_FQDN}"
+export ROOT_OUT_TCB_FQDN="${ROOT_OUT_TCB_FQDN}"
 EOF
 
-# TODO TODO TODO TODO REMOVE RM -rfv TODO TODO TODO TODO
+# TODO TODO TODO TODO Document INIT_COMPLETE_JSON_PATH to reset_state TODO TODO
 tee -a $HOME/.local/share/systemd/user/forge.service.sh <<'EOF'
+if [[ "x${ROOT_IN_TCB_FQDN}" = "xlocalhost" ]] && [[ "x${ROOT_OUT_TCB_FQDN}" = "xlocalhost" ]]; then
+  export CURL_CA_BUNDLE="${HOME}/.local/share/caddy/pki/authorities/local/root.crt"
+fi
+
 reset_state() {
   rm -rfv \
     "${GITEA_WORK_DIR}" \
@@ -275,7 +285,7 @@ create_or_update_route() {
     local unix_socket=$3
 
     export config=$(curl -f --unix-socket $socket_path "http://localhost/config/")
-    echo -e "$fqdn {\n    reverse_proxy $unix_socket\n}\n" \
+    echo -e "$fqdn {\n    reverse_proxy unix/$unix_socket\n}\n" \
     | curl --unix-socket $socket_path http://localhost/adapt \
          -H "Content-Type: text/caddyfile" \
         --data-binary @- \
@@ -310,6 +320,7 @@ create_or_update_route "${CADDY_ADMIN_SOCK_DIR_PATH}/caddy.admin.sock" "${FORGEJ
 echo "awaiting-forgejo";
 
 check_forgejo_initialized_and_running() {
+  curl -vI "https://${FORGEJO_FQDN}"
   STATUS_CODE=$(curl -vI "https://${FORGEJO_FQDN}" 2>/dev/null | head -n 1 | cut -d$' ' -f2)
   if [ "x${STATUS_CODE}" = "x200" ]; then
     return 1
