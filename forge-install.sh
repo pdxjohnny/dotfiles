@@ -28,21 +28,15 @@ if [ "x${FORGEJO_PASSWORD}" = "x" ]; then
   python -m keyring set "${USER}" "${USER}.forgejo.password"
 fi
 
-export SSH_USER="alice"
-# TODO If local...
-export ROOT_IN_TCB_FQDN="localhost"
-export ROOT_OUT_TCB_FQDN="localhost"
-# export ROOT_IN_TCB_FQDN="${ROOT_IN_TCB_FQDN}"
-# export ROOT_OUT_TCB_FQDN="nahdig.com"
-export SSH_HOST="scitt.unstable.${ROOT_IN_TCB_FQDN}"
+export SSH_USER="${SSH_USER:-${USER}}"
+export ROOT_IN_TCB_FQDN="${ROOT_IN_TCB_FQDN:-localhost}"
+export ROOT_OUT_TCB_FQDN="${ROOT_OUT_TCB_FQDN:-localhost}"
+# TODO scitt.unstable. should be something like caddy.admin.
+export SSH_HOST="${SSH_HOST:-scitt.unstable.${ROOT_IN_TCB_FQDN}}"
 export SSH_USER_AT_HOST="${SSH_USER}@${SSH_HOST}"
 export SSH_WORK_DIR="/home/${SSH_USER}"
-export FORGEJO_FQDN="git.pdxjohnny.${ROOT_IN_TCB_FQDN}"
-export DIRECTUS_FQDN="directus.pdxjohnny.${ROOT_IN_TCB_FQDN}"
-
-if [[ "x${ROOT_IN_TCB_FQDN}" = "localhost" ]] && [[ "x${ROOT_OUT_TCB_FQDN}" = "localhost" ]]; then
-  export CURL_CA_BUNDLE="${HOME}/.local/share/caddy/pki/authorities/local/root.crt"
-fi
+export FORGEJO_FQDN="git.${USER}.${ROOT_IN_TCB_FQDN}"
+export DIRECTUS_FQDN="directus.${USER}.${ROOT_IN_TCB_FQDN}"
 
 mkdir -p $HOME/.local/share/systemd/user
 
@@ -54,6 +48,9 @@ Type=simple
 TimeoutStartSec=0
 ExecStart=bash -c "exec ${HOME}/.local/share/systemd/user/forge.service.sh"
 Environment=VIRTUAL_ENV=%h/.local/forgejo-install/.venv
+Environment=SSH_USER=%u
+Environment=ROOT_IN_TCB_FQDN=localhost
+Environment=ROOT_OUT_TCB_FQDN=localhost
 [Install]
 WantedBy=default.target
 EOF
@@ -184,22 +181,30 @@ cleanup() {
 
 trap cleanup EXIT
 
-EOF
-tee -a $HOME/.local/share/systemd/user/forge.service.sh <<EOF
-export DEFAULT_PYTHON="${DEFAULT_PYTHON}"
-export SSH_USER_AT_HOST="${SSH_USER_AT_HOST}"
-export SSH_WORK_DIR="${SSH_WORK_DIR}"
-export FORGEJO_FQDN="${FORGEJO_FQDN}"
-export DIRECTUS_FQDN="${DIRECTUS_FQDN}"
-export ROOT_IN_TCB_FQDN="${ROOT_IN_TCB_FQDN}"
-export ROOT_OUT_TCB_FQDN="${ROOT_OUT_TCB_FQDN}"
-EOF
+export SSH_USER="${SSH_USER:-${USER}}"
+export ROOT_IN_TCB_FQDN="${ROOT_IN_TCB_FQDN:-localhost}"
+export ROOT_OUT_TCB_FQDN="${ROOT_OUT_TCB_FQDN:-localhost}"
+# TODO scitt.unstable. should be something like caddy.admin.
+export SSH_HOST="${SSH_HOST:-scitt.unstable.${ROOT_IN_TCB_FQDN}}"
+export SSH_USER_AT_HOST="${SSH_USER}@${SSH_HOST}"
+export SSH_WORK_DIR="/home/${SSH_USER}"
+export FORGEJO_FQDN="git.${USER}.${ROOT_IN_TCB_FQDN}"
+export DIRECTUS_FQDN="directus.${USER}.${ROOT_IN_TCB_FQDN}"
 
 # TODO TODO TODO TODO Document INIT_COMPLETE_JSON_PATH to reset_state TODO TODO
 tee -a $HOME/.local/share/systemd/user/forge.service.sh <<'EOF'
-if [[ "x${ROOT_IN_TCB_FQDN}" = "xlocalhost" ]] && [[ "x${ROOT_OUT_TCB_FQDN}" = "xlocalhost" ]]; then
-  export CURL_CA_BUNDLE="${HOME}/.local/share/caddy/pki/authorities/local/root.crt"
+export CADDY_USE_SSH=1
+if [[ "x${SSH_USER}" = "x${USER}" ]] && [[ "x${ROOT_IN_TCB_FQDN}" = "xlocalhost" ]] && [[ "x${ROOT_OUT_TCB_FQDN}" = "xlocalhost" ]]; then
+  export CADDY_USE_SSH=0
 fi
+
+tee $HOME/.local/share/systemd/user/forge.service.Caddyfile <<CADDY_EOF
+{
+  admin "unix/${SSH_WORK_DIR}/caddy.admin.sock" {
+    origins localhost
+  }
+}
+CADDY_EOF
 
 reset_state() {
   rm -rfv \
@@ -282,10 +287,10 @@ get_route_id() {
 create_or_update_route() {
     local socket_path=$1
     local fqdn=$2
-    local unix_socket=$3
+    local target=$3
 
     export config=$(curl -f --unix-socket $socket_path "http://localhost/config/")
-    echo -e "$fqdn {\n    reverse_proxy unix/$unix_socket\n}\n" \
+    echo -e "$fqdn {\n    reverse_proxy $target\n}\n" \
     | curl --unix-socket $socket_path http://localhost/adapt \
          -H "Content-Type: text/caddyfile" \
         --data-binary @- \
@@ -297,6 +302,13 @@ create_or_update_route() {
          -d @-
 }
 
+if [[ "x${CADDY_USE_SSH}" = "x0" ]]; then
+  export CURL_CA_BUNDLE="${HOME}/.local/share/caddy/pki/authorities/local/root.crt"
+  caddy run --config "${HOME}/.local/share/systemd/user/forge.service.Caddyfile" &
+  CADDY_PID=$!
+  new_pid "${CADDY_PID}"
+fi
+
 forgejo web --port 0 &
 FORGEJO_PID=$!
 new_pid "${FORGEJO_PID}"
@@ -305,17 +317,30 @@ until find_listening_ports "${FORGEJO_PID}"; do sleep 0.01; done
 set -x
 FORGEJO_PORT=$(find_listening_ports "${FORGEJO_PID}")
 
-CADDY_ADMIN_SOCK_DIR_PATH=$(new_tempdir)
-ssh -o StrictHostKeyChecking=no -nNT -L "${CADDY_ADMIN_SOCK_DIR_PATH}/caddy.admin.sock:${SSH_WORK_DIR}/caddy.admin.sock" "${SSH_USER_AT_HOST}" &
-CADDY_ADMIN_SOCK_SSH_TUNNEL_PID=$!
-new_pid "${CADDY_ADMIN_SOCK_SSH_TUNNEL_PID}"
 
-ssh -o StrictHostKeyChecking=no -nT "${SSH_USER_AT_HOST}" rm -fv "${SSH_WORK_DIR}/${FORGEJO_FQDN}.sock"
-ssh -o StrictHostKeyChecking=no -nNT -R "${SSH_WORK_DIR}/${FORGEJO_FQDN}.sock:127.0.0.1:${FORGEJO_PORT}" "${SSH_USER_AT_HOST}" &
-FORGEJO_SSH_TUNNEL_PID=$!
-new_pid "${FORGEJO_SSH_TUNNEL_PID}"
+export CADDY_ADMIN_SOCKET="${SSH_WORK_DIR}/caddy.admin.sock"
+if [[ "x${CADDY_USE_SSH}" = "x1" ]]; then
+  CADDY_ADMIN_SOCK_DIR_PATH=$(new_tempdir)
+  export CADDY_ADMIN_SOCKET_OVER_SSH="${CADDY_ADMIN_SOCK_DIR_PATH}/caddy.admin.sock"
+  ssh -o StrictHostKeyChecking=no -nNT -L "${CADDY_ADMIN_SOCKET_OVER_SSH}:${CADDY_ADMIN_SOCKET}" "${SSH_USER_AT_HOST}" &
+  CADDY_ADMIN_SOCK_SSH_TUNNEL_PID=$!
+  new_pid "${CADDY_ADMIN_SOCK_SSH_TUNNEL_PID}"
+  export CADDY_ADMIN_SOCKET="${CADDY_ADMIN_SOCKET_OVER_SSH}"
+fi
 
-create_or_update_route "${CADDY_ADMIN_SOCK_DIR_PATH}/caddy.admin.sock" "${FORGEJO_FQDN}" "${SSH_WORK_DIR}/${FORGEJO_FQDN}.sock"
+
+export FORGEJO_CADDY_TARGET="127.0.0.1:${FORGEJO_PORT}"
+if [[ "x${CADDY_USE_SSH}" = "x1" ]]; then
+  export FORGEJO_SOCK="${SSH_WORK_DIR}/${FORGEJO_FQDN}.sock"
+  ssh -o StrictHostKeyChecking=no -nT "${SSH_USER_AT_HOST}" rm -fv "${FORGEJO_SOCK}"
+  ssh -o StrictHostKeyChecking=no -nNT -R "${FORGEJO_SOCK}:${FORGEJO_CADDY_TARGET}" "${SSH_USER_AT_HOST}" &
+  FORGEJO_SSH_TUNNEL_PID=$!
+  new_pid "${FORGEJO_SSH_TUNNEL_PID}"
+  export FORGEJO_CADDY_TARGET="unix/${FORGEJO_SOCK}"
+else
+  export FORGEJO_CADDY_TARGET="http://${FORGEJO_CADDY_TARGET}"
+fi
+create_or_update_route "${CADDY_ADMIN_SOCKET}" "${FORGEJO_FQDN}" "${FORGEJO_CADDY_TARGET}"
 
 echo "awaiting-forgejo";
 
@@ -407,14 +432,23 @@ DIRECTUS_CONTAINER_LOGS_PID=$!
 new_pid "${DIRECTUS_CONTAINER_LOGS_PID}"
 
 DIRECTUS_CONTAINER_IP=$(docker inspect --format json "${DIRECTUS_CONTAINER_ID}" | jq -r '.[0].NetworkSettings.IPAddress')
-ssh -o StrictHostKeyChecking=no -nT "${SSH_USER_AT_HOST}" rm -fv "${SSH_WORK_DIR}/${DIRECTUS_FQDN}.sock"
-ssh -o StrictHostKeyChecking=no -nNT -R "${SSH_WORK_DIR}/${DIRECTUS_FQDN}.sock:${DIRECTUS_CONTAINER_IP}:8055" "${SSH_USER_AT_HOST}" &
-DIRECTUS_SSH_TUNNEL_PID=$!
-new_pid "${DIRECTUS_SSH_TUNNEL_PID}"
 
-create_or_update_route "${CADDY_ADMIN_SOCK_DIR_PATH}/caddy.admin.sock" "${DIRECTUS_FQDN}" "${SSH_WORK_DIR}/${DIRECTUS_FQDN}.sock"
+export DIRECTUS_CADDY_TARGET="${DIRECTUS_CONTAINER_IP}:8055"
+if [[ "x${CADDY_USE_SSH}" = "x1" ]]; then
+  export DIRECTUS_SOCK="${SSH_WORK_DIR}/${DIRECTUS_FQDN}.sock"
+  ssh -o StrictHostKeyChecking=no -nT "${SSH_USER_AT_HOST}" rm -fv "${DIRECTUS_SOCK}"
+  ssh -o StrictHostKeyChecking=no -nNT -R "${DIRECTUS_SOCK}:${DIRECTUS_CADDY_TARGET}" "${SSH_USER_AT_HOST}" &
+  DIRECTUS_SSH_TUNNEL_PID=$!
+  new_pid "${DIRECTUS_SSH_TUNNEL_PID}"
+  export DIRECTUS_CADDY_TARGET="unix/${DIRECTUS_SOCK}"
+else
+  export DIRECTUS_CADDY_TARGET="http://${DIRECTUS_CADDY_TARGET}"
+fi
+create_or_update_route "${CADDY_ADMIN_SOCKET}" "${DIRECTUS_FQDN}" "${DIRECTUS_CADDY_TARGET}"
 
-kill "${CADDY_ADMIN_SOCK_SSH_TUNNEL_PID}"
+if [[ "x${CADDY_USE_SSH}" = "x1" ]]; then
+  kill "${CADDY_ADMIN_SOCK_SSH_TUNNEL_PID}"
+fi
 
 tail -F /dev/null
 EOF
