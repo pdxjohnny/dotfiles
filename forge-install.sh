@@ -309,15 +309,6 @@ if [[ "x${CADDY_USE_SSH}" = "x0" ]]; then
   new_pid "${CADDY_PID}"
 fi
 
-forgejo web --port 0 &
-FORGEJO_PID=$!
-new_pid "${FORGEJO_PID}"
-set +x
-until find_listening_ports "${FORGEJO_PID}"; do sleep 0.01; done
-set -x
-FORGEJO_PORT=$(find_listening_ports "${FORGEJO_PID}")
-
-
 export CADDY_ADMIN_SOCKET="${SSH_WORK_DIR}/caddy.admin.sock"
 if [[ "x${CADDY_USE_SSH}" = "x1" ]]; then
   CADDY_ADMIN_SOCK_DIR_PATH=$(new_tempdir)
@@ -328,6 +319,14 @@ if [[ "x${CADDY_USE_SSH}" = "x1" ]]; then
   export CADDY_ADMIN_SOCKET="${CADDY_ADMIN_SOCKET_OVER_SSH}"
 fi
 
+
+forgejo web --port 0 &
+FORGEJO_PID=$!
+new_pid "${FORGEJO_PID}"
+set +x
+until find_listening_ports "${FORGEJO_PID}"; do sleep 0.01; done
+set -x
+FORGEJO_PORT=$(find_listening_ports "${FORGEJO_PID}")
 
 export FORGEJO_CADDY_TARGET="127.0.0.1:${FORGEJO_PORT}"
 if [[ "x${CADDY_USE_SSH}" = "x1" ]]; then
