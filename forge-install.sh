@@ -206,6 +206,22 @@ tee $HOME/.local/share/systemd/user/forge.service.Caddyfile <<CADDY_EOF
 }
 CADDY_EOF
 
+export TEMPLATE_CADDYFILE_REVERSE_PROXY_OIDC_PATH="${HOME}/.local/share/systemd/user/forge.service.Caddyfile"
+tee "${TEMPLATE_CADDYFILE_REVERSE_PROXY_OIDC_PATH}" <<CADDY_EOF
+FQDN {
+    route {
+        oidcauth {
+            client_id CLIENT_ID
+            client_secret CLIENT_SECRET
+            issuer ISSUER
+            redirect_url REDIRECT_URL
+        }
+
+        reverse_proxy TARGET
+    }
+}
+CADDY_EOF
+
 reset_state() {
   rm -rfv \
     "${GITEA_WORK_DIR}" \
@@ -291,6 +307,34 @@ create_or_update_route() {
 
     export config=$(curl -f --unix-socket $socket_path "http://localhost/config/")
     echo -e "$fqdn {\n    reverse_proxy $target\n}\n" \
+    | curl --unix-socket $socket_path http://localhost/adapt \
+         -H "Content-Type: text/caddyfile" \
+        --data-binary @- \
+    | tee /tmp/1 \
+    | jq '.result * (env.config | fromjson)' \
+    | tee /tmp/2 \
+    | curl -f -X POST --unix-socket $socket_path "http://localhost/config/" \
+         -H "Content-Type: application/json" \
+         -d @-
+}
+
+create_or_update_route_protect_with_oidc() {
+    local socket_path=$1
+    local fqdn=$2
+    local target=$3
+    local issuer_fqdn=$4
+    local client_id=$5
+    local client_secret=$6
+    local redirect_url=${7:-"https:\/\/${fqdn}/callback"}
+
+    export config=$(curl -f --unix-socket $socket_path "http://localhost/config/")
+    cat "${TEMPLATE_CADDYFILE_REVERSE_PROXY_OIDC_PATH}" \
+    | sed \
+        -e "s/TARGET/${target}/g" \
+        -e "s/CLIENT_ID/${client_id}/g" \
+        -e "s/CLIENT_SECRET/${client_secret}/g" \
+        -e "s/ISSUER/https:\/\/${issuer_fqdn}/g" \
+        -e "s/REDIRECT_URL/${redirect_url}/g" \
     | curl --unix-socket $socket_path http://localhost/adapt \
          -H "Content-Type: text/caddyfile" \
         --data-binary @- \
