@@ -107,7 +107,7 @@ EOF
 
 export NEW_OAUTH2_APPLICATION_YAML_PATH="${HOME}/.local/forgejo-install/directus_oauth2_application.yaml"
 tee "${NEW_OAUTH2_APPLICATION_YAML_PATH}" <<EOF
-name: 'Directus'
+name: 'OAUTH2_APPLICATION_NAME'
 confidential_client: true
 redirect_uris:
 - 'https://${DIRECTUS_FQDN}/auth/login/forgejo/callback'
@@ -206,7 +206,7 @@ tee $HOME/.local/share/systemd/user/forge.service.Caddyfile <<CADDY_EOF
 }
 CADDY_EOF
 
-export TEMPLATE_CADDYFILE_REVERSE_PROXY_OIDC_PATH="${HOME}/.local/share/systemd/user/forge.service.Caddyfile"
+export TEMPLATE_CADDYFILE_REVERSE_PROXY_OIDC_PATH="${HOME}/.local/forgejo-install/reverse_proxy_oidc.Caddyfile"
 tee "${TEMPLATE_CADDYFILE_REVERSE_PROXY_OIDC_PATH}" <<CADDY_EOF
 FQDN {
     route {
@@ -221,6 +221,40 @@ FQDN {
     }
 }
 CADDY_EOF
+
+export MINDSDB_CONFIG_PATH="${HOME}/.local/forgejo-install/mindsdb-config.json"
+tee "${MINDSDB_CONFIG_PATH}" <<MINDSDB_EOF
+{
+    "permanent_storage": {
+        "location": "local"
+    },
+    "paths": {},
+    "log": {
+        "level": {
+            "console": "DEBUG",
+            "file": "DEBUG",
+            "db": "DEBUG"
+        }
+    },
+    "debug": true,
+    "integrations": {},
+    "gui": {
+        "autoupdate": false
+    },
+    "auth":{
+        "http_auth_enabled": false
+    },
+    "api": {
+        "http": {
+            "host": "127.0.0.1",
+            "port": 0
+        }
+    },
+    "cache": {
+        "type": "local"
+    }
+}
+MINDSDB_EOF
 
 reset_state() {
   rm -rfv \
@@ -412,13 +446,26 @@ check_forgejo_initialized_and_running() {
       FORGEJO_TOKEN=$(get_forgejo_token)
     done
 
+    export OAUTH2_APPLICATION_NAME="Directus"
     data=$(
       cat "${NEW_OAUTH2_APPLICATION_YAML_PATH}" \
+        | sed -e "s/OAUTH2_APPLICATION_NAME/${OAUTH2_APPLICATION_NAME}/g" \
         | python -c 'import sys, json, yaml; print(json.dumps(yaml.safe_load(sys.stdin)))'
     )
     export RESPONSE=$(curl -vf -u "${FORGEJO_USERNAME}:${FORGEJO_PASSWORD}" -H "Content-Type: application/json" --data "${data}" "https://${FORGEJO_FQDN}/api/v1/user/applications/oauth2" | jq -c)
     jq -rn 'env.RESPONSE | fromjson | .client_id' | python -m keyring set ${USER} ${USER}.directus.auth.forgejo.client_id
     jq -rn 'env.RESPONSE | fromjson | .client_secret' | python -m keyring set ${USER} ${USER}.directus.auth.forgejo.client_secret
+    unset RESPONSE
+
+    export OAUTH2_APPLICATION_NAME="MindsDB"
+    data=$(
+      cat "${NEW_OAUTH2_APPLICATION_YAML_PATH}" \
+        | sed -e "s/OAUTH2_APPLICATION_NAME/${OAUTH2_APPLICATION_NAME}/g" \
+        | python -c 'import sys, json, yaml; print(json.dumps(yaml.safe_load(sys.stdin)))'
+    )
+    export RESPONSE=$(curl -vf -u "${FORGEJO_USERNAME}:${FORGEJO_PASSWORD}" -H "Content-Type: application/json" --data "${data}" "https://${FORGEJO_FQDN}/api/v1/user/applications/oauth2" | jq -c)
+    jq -rn 'env.RESPONSE | fromjson | .client_id' | python -m keyring set ${USER} ${USER}.mindsdb.auth.forgejo.client_id
+    jq -rn 'env.RESPONSE | fromjson | .client_secret' | python -m keyring set ${USER} ${USER}.mindsdb.auth.forgejo.client_secret
     unset RESPONSE
 
     # TODO Add Application ID, etc. non secrets to init-complete.yaml
@@ -442,6 +489,27 @@ echo "forgejo-first-time-init-complete";
 cleanup_files
 
 echo TODO Configure openid client_id and client_secret
+
+python -m mindsdb --verbose --api=http --config="${MINDSDB_CONFIG_PATH}" &
+MINDSDB_PID=$!
+new_pid "${MINDSDB_PID}"
+set +x
+until find_listening_ports "${MINDSDB_PID}"; do sleep 0.01; done
+set -x
+MINDSDB_PORT=$(find_listening_ports "${MINDSDB_PID}")
+
+export MINDSDB_CADDY_TARGET="127.0.0.1:${MINDSDB_PORT}"
+if [[ "x${CADDY_USE_SSH}" = "x1" ]]; then
+  export MINDSDB_SOCK="${SSH_WORK_DIR}/${MINDSDB_FQDN}.sock"
+  ssh -o StrictHostKeyChecking=no -nT "${SSH_USER_AT_HOST}" rm -fv "${MINDSDB_SOCK}"
+  ssh -o StrictHostKeyChecking=no -nNT -R "${MINDSDB_SOCK}:${MINDSDB_CADDY_TARGET}" "${SSH_USER_AT_HOST}" &
+  MINDSDB_SSH_TUNNEL_PID=$!
+  new_pid "${MINDSDB_SSH_TUNNEL_PID}"
+  export MINDSDB_CADDY_TARGET="unix/${MINDSDB_SOCK}"
+else
+  export MINDSDB_CADDY_TARGET="http://${MINDSDB_CADDY_TARGET}"
+fi
+create_or_update_route_protect_with_oidc "${CADDY_ADMIN_SOCKET}" "${MINDSDB_FQDN}" "${MINDSDB_CADDY_TARGET}" "${FORGEJO_FQDN}"
 
 wait_for_and_populate_directus_admin_role_id_txt &
 
