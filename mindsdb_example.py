@@ -11,7 +11,8 @@ def main():
     if not question:
         sys.exit(1)
 
-    con = mindsdb_sdk.connect("https://mindsdb.pdxjohnny.localhost:443")
+    # con = mindsdb_sdk.connect("https://mindsdb.pdxjohnny.localhost:443")
+    con = mindsdb_sdk.connect("http://mindsdb.pdxjohnny.localhost:40795")
 
     # IMPORTANT: This code requires to set OPENAI_API_KEY as env variable
 
@@ -23,11 +24,12 @@ def main():
     # print('Adding Hooblyblob details...')
     # agent.add_file('./hooblyblob.txt', 'Details about the company Hooblyblob')
 
-    # print('Adding rulebook details...')
-    # agent.add_files(['./codenames-rulebook.pdf'], 'Rulebooks for various board games')
+    print('Adding files...')
+    agent.add_webpages(['https://pdxjohnny.github.io/maryisgod/'],
+                    'Info on Alice can be found here')
 
-    print('Adding pdxjohnny.github.io...')
-    agent.add_webpages(['pdxjohnny.github.io'], 'Documentation for MindsDB')
+    # print('Adding pdxjohnny.github.io...')
+    # agent.add_webpages(['pdxjohnny.github.io'], 'Documentation for MindsDB')
 
     print('Agent ready to use.')
     answer = agent.completion([{'question': question, 'answer': None}])

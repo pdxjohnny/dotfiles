@@ -42,11 +42,26 @@ mkdir -p $HOME/.local/share/systemd/user
 
 tee $HOME/.local/share/systemd/user/forge.service <<'EOF'
 [Unit]
-Description=Secure Softare Forge
+Description=Secure Softare Forge: VCS: Forgejo
 [Service]
 Type=simple
 TimeoutStartSec=0
 ExecStart=bash -c "exec ${HOME}/.local/share/systemd/user/forge.service.sh"
+Environment=VIRTUAL_ENV=%h/.local/forgejo-install/.venv
+Environment=SSH_USER=%u
+Environment=ROOT_IN_TCB_FQDN=localhost
+Environment=ROOT_OUT_TCB_FQDN=localhost
+[Install]
+WantedBy=default.target
+EOF
+
+tee $HOME/.local/share/systemd/user/mindsdb.service <<'EOF'
+[Unit]
+Description=Secure Softare Forge: AI: MindsDB
+[Service]
+Type=simple
+TimeoutStartSec=0
+ExecStart=bash -c "OPENAI_API_KEY=$(python -m keyring get $USER openai.api.key) python -m mindsdb --verbose --api=http --config %h/.local/forgejo-install/mindsdb-config.json"
 Environment=VIRTUAL_ENV=%h/.local/forgejo-install/.venv
 Environment=SSH_USER=%u
 Environment=ROOT_IN_TCB_FQDN=localhost
