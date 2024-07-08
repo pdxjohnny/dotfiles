@@ -12,7 +12,7 @@ def main():
         sys.exit(1)
 
     # con = mindsdb_sdk.connect("https://mindsdb.pdxjohnny.localhost:443")
-    con = mindsdb_sdk.connect("http://mindsdb.pdxjohnny.localhost:40795")
+    con = mindsdb_sdk.connect("http://mindsdb.pdxjohnny.localhost:37893")
 
     # IMPORTANT: This code requires to set OPENAI_API_KEY as env variable
 
@@ -25,8 +25,8 @@ def main():
     # agent.add_file('./hooblyblob.txt', 'Details about the company Hooblyblob')
 
     print('Adding files...')
-    agent.add_webpages(['https://pdxjohnny.github.io/maryisgod/'],
-                    'Info on Alice can be found here')
+    agent.add_webpages(['https://pdxjohnny.github.io/about/'],
+                    'Info on John can be found here')
 
     # print('Adding pdxjohnny.github.io...')
     # agent.add_webpages(['pdxjohnny.github.io'], 'Documentation for MindsDB')
