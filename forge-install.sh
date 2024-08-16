@@ -39,14 +39,30 @@ export FORGEJO_FQDN="git.${USER}.${ROOT_IN_TCB_FQDN}"
 export DIRECTUS_FQDN="directus.${USER}.${ROOT_IN_TCB_FQDN}"
 
 mkdir -p $HOME/.local/share/systemd/user
+cp -v ${0} $HOME/.local/share/systemd/user/forge-install.sh
 
 tee $HOME/.local/share/systemd/user/forge.service <<'EOF'
+[Unit]
+Description=Secure Softare Forge
+[Service]
+Type=simple
+TimeoutStartSec=0
+ExecStart=bash -c "exec ${HOME}/.local/share/systemd/user/forge.service.sh"
+Environment=VIRTUAL_ENV=%h/.local/forgejo-install/.venv
+Environment=SSH_USER=%u
+Environment=ROOT_IN_TCB_FQDN=localhost
+Environment=ROOT_OUT_TCB_FQDN=localhost
+[Install]
+WantedBy=default.target
+EOF
+
+tee $HOME/.local/share/systemd/user/forgejo.service <<'EOF'
 [Unit]
 Description=Secure Softare Forge: VCS: Forgejo
 [Service]
 Type=simple
 TimeoutStartSec=0
-ExecStart=bash -c "exec ${HOME}/.local/share/systemd/user/forge.service.sh"
+ExecStart=forgejo web --port 0
 Environment=VIRTUAL_ENV=%h/.local/forgejo-install/.venv
 Environment=SSH_USER=%u
 Environment=ROOT_IN_TCB_FQDN=localhost
@@ -128,12 +144,6 @@ redirect_uris:
 - 'https://${DIRECTUS_FQDN}/auth/login/forgejo/callback'
 EOF
 
-touch $HOME/.local/share/systemd/user/forge.service.sh
-chmod 755 $HOME/.local/share/systemd/user/forge.service.sh
-tee $HOME/.local/share/systemd/user/forge.service.sh <<'EOF'
-#!/usr/bin/env bash
-set -xeuo pipefail
-
 declare -a TEMPDIRS=()
 
 new_tempdir() {
@@ -206,8 +216,6 @@ export SSH_WORK_DIR="/home/${SSH_USER}"
 export FORGEJO_FQDN="git.${USER}.${ROOT_IN_TCB_FQDN}"
 export DIRECTUS_FQDN="directus.${USER}.${ROOT_IN_TCB_FQDN}"
 
-# TODO TODO TODO TODO Document INIT_COMPLETE_JSON_PATH to reset_state TODO TODO
-tee -a $HOME/.local/share/systemd/user/forge.service.sh <<'EOF'
 export CADDY_USE_SSH=1
 if [[ "x${SSH_USER}" = "x${USER}" ]] && [[ "x${ROOT_IN_TCB_FQDN}" = "xlocalhost" ]] && [[ "x${ROOT_OUT_TCB_FQDN}" = "xlocalhost" ]]; then
   export CADDY_USE_SSH=0
@@ -395,7 +403,73 @@ create_or_update_route_protect_with_oidc() {
          -d @-
 }
 
-if [[ "x${CADDY_USE_SSH}" = "x0" ]]; then
+# Function to wait for a service to be ready
+wait_for_service_ready() {
+    local service_name="$1"
+    local fqdn="$2"
+    local sock_dir="$3"
+    local caddy_target="$4"
+    local use_ssh="$5"
+    local user_at_host="$6"
+    local max_attempts=10
+    local pid
+
+    echo "Waiting for $service_name to be ready..."
+
+    until [ $max_attempts -le 0 ] || pid=$(get_user_service_pid "$service_name"); do
+        sleep 0.01
+        ((max_attempts--))
+    done
+
+    if [ $max_attempts -eq 0 ]; then
+        echo "Timed out waiting for $service_name to be ready."
+        return 1
+    fi
+
+    echo "$service_name is ready with PID: $pid"
+    echo "Setting up additional configurations..."
+
+    # Example operations after service is ready
+    set +x
+    until find_listening_ports "$pid"; do sleep 0.01; done
+    set -x
+
+    local forgejo_port=$(find_listening_ports "$pid")
+    export FORGEJO_CADDY_TARGET="$caddy_target"
+
+    if [[ "x$use_ssh" = "x1" ]]; then
+        export FORGEJO_SOCK="${sock_dir}/${fqdn}.sock"
+        ssh -o StrictHostKeyChecking=no -nT "${user_at_host}" rm -fv "${FORGEJO_SOCK}"
+        ssh -o StrictHostKeyChecking=no -nNT -R "${FORGEJO_SOCK}:${FORGEJO_CADDY_TARGET}" "${user_at_host}" &
+        FORGEJO_SSH_TUNNEL_PID=$!
+        new_pid "${FORGEJO_SSH_TUNNEL_PID}"
+        export FORGEJO_CADDY_TARGET="unix/${FORGEJO_SOCK}"
+    else
+        export FORGEJO_CADDY_TARGET="http://${FORGEJO_CADDY_TARGET}"
+    fi
+
+    create_or_update_route "${CADDY_ADMIN_SOCKET}" "${fqdn}" "${FORGEJO_CADDY_TARGET}"
+}
+
+# Function to get the PID of a user service
+get_user_service_pid() {
+    local service_name="$1"
+    local pid=$(systemctl --user show -p MainPID "$service_name" --value)
+    echo "$pid"
+}
+
+
+touch $HOME/.local/share/systemd/user/forge.service.sh
+chmod 755 $HOME/.local/share/systemd/user/forge.service.sh
+tee $HOME/.local/share/systemd/user/forge.service.sh <<'EOF'
+#!/usr/bin/env bash
+set -xeuo pipefail
+
+export JUST_IMPORT=1
+. "${HOME}/.local/share/systemd/user/forge-install.sh"
+unset JUST_IMPORT
+
+if [ -z ${CADDY_USE_SSH:+x} ]; then
   export CURL_CA_BUNDLE="${HOME}/.local/share/caddy/pki/authorities/local/root.crt"
   caddy run --config "${HOME}/.local/share/systemd/user/forge.service.Caddyfile" &
   CADDY_PID=$!
@@ -403,7 +477,7 @@ if [[ "x${CADDY_USE_SSH}" = "x0" ]]; then
 fi
 
 export CADDY_ADMIN_SOCKET="${SSH_WORK_DIR}/caddy.admin.sock"
-if [[ "x${CADDY_USE_SSH}" = "x1" ]]; then
+if [ -z ${CADDY_USE_SSH:+x} ]; then
   CADDY_ADMIN_SOCK_DIR_PATH=$(new_tempdir)
   export CADDY_ADMIN_SOCKET_OVER_SSH="${CADDY_ADMIN_SOCK_DIR_PATH}/caddy.admin.sock"
   ssh -o StrictHostKeyChecking=no -nNT -L "${CADDY_ADMIN_SOCKET_OVER_SSH}:${CADDY_ADMIN_SOCKET}" "${SSH_USER_AT_HOST}" &
@@ -412,17 +486,29 @@ if [[ "x${CADDY_USE_SSH}" = "x1" ]]; then
   export CADDY_ADMIN_SOCKET="${CADDY_ADMIN_SOCKET_OVER_SSH}"
 fi
 
+# Example usage:
+CADDY_ADMIN_SOCK_DIR_PATH=$(new_tempdir)
+wait_for_service_ready forgejo "${FORGEJO_FQDN}" "${CADDY_ADMIN_SOCK_DIR_PATH}" "http://localhost:8080" 1 user@host
 
-forgejo web --port 0 &
-FORGEJO_PID=$!
-new_pid "${FORGEJO_PID}"
+export CADDY_ADMIN_SOCKET="${SSH_WORK_DIR}/caddy.admin.sock"
+if [ -z ${CADDY_USE_SSH:+x} ]; then
+  CADDY_ADMIN_SOCK_DIR_PATH=$(new_tempdir)
+  export CADDY_ADMIN_SOCKET_OVER_SSH="${CADDY_ADMIN_SOCK_DIR_PATH}/caddy.admin.sock"
+  ssh -o StrictHostKeyChecking=no -nNT -L "${CADDY_ADMIN_SOCKET_OVER_SSH}:${CADDY_ADMIN_SOCKET}" "${SSH_USER_AT_HOST}" &
+  CADDY_ADMIN_SOCK_SSH_TUNNEL_PID=$!
+  new_pid "${CADDY_ADMIN_SOCK_SSH_TUNNEL_PID}"
+  export CADDY_ADMIN_SOCKET="${CADDY_ADMIN_SOCKET_OVER_SSH}"
+fi
+
+wait_for_service_ready forgejo 10
+FORGEJO_PID=$(get_user_service_pid forgejo)
 set +x
 until find_listening_ports "${FORGEJO_PID}"; do sleep 0.01; done
 set -x
 FORGEJO_PORT=$(find_listening_ports "${FORGEJO_PID}")
 
 export FORGEJO_CADDY_TARGET="127.0.0.1:${FORGEJO_PORT}"
-if [[ "x${CADDY_USE_SSH}" = "x1" ]]; then
+if [ -z ${CADDY_USE_SSH:+x} ]; then
   export FORGEJO_SOCK="${SSH_WORK_DIR}/${FORGEJO_FQDN}.sock"
   ssh -o StrictHostKeyChecking=no -nT "${SSH_USER_AT_HOST}" rm -fv "${FORGEJO_SOCK}"
   ssh -o StrictHostKeyChecking=no -nNT -R "${FORGEJO_SOCK}:${FORGEJO_CADDY_TARGET}" "${SSH_USER_AT_HOST}" &
@@ -514,7 +600,7 @@ set -x
 MINDSDB_PORT=$(find_listening_ports "${MINDSDB_PID}")
 
 export MINDSDB_CADDY_TARGET="127.0.0.1:${MINDSDB_PORT}"
-if [[ "x${CADDY_USE_SSH}" = "x1" ]]; then
+if [ -z ${CADDY_USE_SSH:+x} ]; then
   export MINDSDB_SOCK="${SSH_WORK_DIR}/${MINDSDB_FQDN}.sock"
   ssh -o StrictHostKeyChecking=no -nT "${SSH_USER_AT_HOST}" rm -fv "${MINDSDB_SOCK}"
   ssh -o StrictHostKeyChecking=no -nNT -R "${MINDSDB_SOCK}:${MINDSDB_CADDY_TARGET}" "${SSH_USER_AT_HOST}" &
@@ -560,7 +646,7 @@ new_pid "${DIRECTUS_CONTAINER_LOGS_PID}"
 DIRECTUS_CONTAINER_IP=$(docker inspect --format json "${DIRECTUS_CONTAINER_ID}" | jq -r '.[0].NetworkSettings.IPAddress')
 
 export DIRECTUS_CADDY_TARGET="${DIRECTUS_CONTAINER_IP}:8055"
-if [[ "x${CADDY_USE_SSH}" = "x1" ]]; then
+if [ -z ${CADDY_USE_SSH:+x} ]; then
   export DIRECTUS_SOCK="${SSH_WORK_DIR}/${DIRECTUS_FQDN}.sock"
   ssh -o StrictHostKeyChecking=no -nT "${SSH_USER_AT_HOST}" rm -fv "${DIRECTUS_SOCK}"
   ssh -o StrictHostKeyChecking=no -nNT -R "${DIRECTUS_SOCK}:${DIRECTUS_CADDY_TARGET}" "${SSH_USER_AT_HOST}" &
@@ -572,13 +658,17 @@ else
 fi
 create_or_update_route "${CADDY_ADMIN_SOCKET}" "${DIRECTUS_FQDN}" "${DIRECTUS_CADDY_TARGET}"
 
-if [[ "x${CADDY_USE_SSH}" = "x1" ]]; then
+if [ -z ${CADDY_USE_SSH:+x} ]; then
   kill "${CADDY_ADMIN_SOCK_SSH_TUNNEL_PID}"
 fi
 
 tail -F /dev/null
 EOF
 
-systemctl --user daemon-reload
-systemctl --user enable forge.service
-systemctl --user restart forge.service
+if [ -z ${JUST_IMPORT+x} ]; then
+  systemctl --user daemon-reload
+  systemctl --user enable --now mindsdb.service
+  systemctl --user enable --now forgejo.service
+  systemctl --user enable --now forge.service
+  systemctl --user restart forge.service
+fi
