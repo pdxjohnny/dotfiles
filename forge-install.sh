@@ -62,11 +62,12 @@ Description=Secure Softare Forge: VCS: Forgejo
 [Service]
 Type=simple
 TimeoutStartSec=0
-ExecStart=forgejo web --port 0
+ExecStart=forgejo web --port 0 --custom-path "${GITEA_WORK_DIR}"
 Environment=VIRTUAL_ENV=%h/.local/forgejo-install/.venv
 Environment=SSH_USER=%u
 Environment=ROOT_IN_TCB_FQDN=localhost
 Environment=ROOT_OUT_TCB_FQDN=localhost
+Environment=GITEA_WORK_DIR="%h/.local/forgejo"
 [Install]
 WantedBy=default.target
 EOF
@@ -488,7 +489,6 @@ fi
 
 # Example usage:
 CADDY_ADMIN_SOCK_DIR_PATH=$(new_tempdir)
-wait_for_service_ready forgejo "${FORGEJO_FQDN}" "${CADDY_ADMIN_SOCK_DIR_PATH}" "http://localhost:8080" 1 user@host
 
 export CADDY_ADMIN_SOCKET="${SSH_WORK_DIR}/caddy.admin.sock"
 if [ -z ${CADDY_USE_SSH:+x} ]; then
@@ -500,7 +500,7 @@ if [ -z ${CADDY_USE_SSH:+x} ]; then
   export CADDY_ADMIN_SOCKET="${CADDY_ADMIN_SOCKET_OVER_SSH}"
 fi
 
-wait_for_service_ready forgejo 10
+systemctl --user enable --now forgejo
 FORGEJO_PID=$(get_user_service_pid forgejo)
 set +x
 until find_listening_ports "${FORGEJO_PID}"; do sleep 0.01; done
@@ -521,6 +521,8 @@ fi
 create_or_update_route "${CADDY_ADMIN_SOCKET}" "${FORGEJO_FQDN}" "${FORGEJO_CADDY_TARGET}"
 
 echo "awaiting-forgejo";
+
+wait_for_service_ready forgejo "${FORGEJO_FQDN}" "${CADDY_ADMIN_SOCK_DIR_PATH}" "${FORGEJO_CADDY_TARGET}" "${CADDY_USE_SSH}" "${SSH_USER_AT_HOST}"
 
 check_forgejo_initialized_and_running() {
   curl -vI "https://${FORGEJO_FQDN}"
