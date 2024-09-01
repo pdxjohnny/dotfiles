@@ -321,3 +321,15 @@ function git_grep_and_edit {
   local LINE_NO=$(git grep -n "$@" | sed -e 's/:/__HELPER_LINENO_REPLACE__/2' | sed -e 's/__HELPER_LINENO_REPLACE__.*//g' -e 's/.*://g' | head -n ${RESULT_NUM:-1} | tail -n 1);
   vim "+${LINE_NO}" "${FILE}";
 }
+
+alice() {
+  cd ~/Documents/formats/github-webhook/
+  python -m keyring del alice agents.alice.id 2>/dev/null 1>/dev/null || true
+  python -u agi.py
+}
+
+aalice() {
+  export PS1="alice $ "
+  echo ${PS1}
+  alice
+}

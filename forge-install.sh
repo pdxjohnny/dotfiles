@@ -56,6 +56,23 @@ Environment=ROOT_OUT_TCB_FQDN=localhost
 WantedBy=default.target
 EOF
 
+tee $HOME/.local/share/systemd/user/caddy.service <<'EOF'
+[Unit]
+Description=Secure Softare Forge: PaaS: Reverse Proxy
+[Service]
+Type=simple
+TimeoutStartSec=0
+ExecStart=caddy --config "${CADDY_CONFIG_PATH}" --pidfile
+Environment=CADDY_CONFIG_PATH=
+Environment=VIRTUAL_ENV=%h/.local/forgejo-install/.venv
+Environment=SSH_USER=%u
+Environment=ROOT_IN_TCB_FQDN=localhost
+Environment=ROOT_OUT_TCB_FQDN=localhost
+Environment=GITEA_WORK_DIR="%h/.local/forgejo"
+[Install]
+WantedBy=default.target
+EOF
+
 tee $HOME/.local/share/systemd/user/forgejo.service <<'EOF'
 [Unit]
 Description=Secure Softare Forge: VCS: Forgejo
