@@ -325,13 +325,13 @@ function git_grep_and_edit {
 alice() {
   cd ~/Documents/formats/github-webhook/
   python -m keyring del alice agents.alice.id 2>/dev/null 1>/dev/null || true
-  python -u agi.py
+  python -u agi.py $@
 }
 
 lalice() {
   export PS1="alice $ "
   echo ${PS1}
-  alice
+  alice $@
 }
 
 ralice() {
